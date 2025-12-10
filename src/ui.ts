@@ -2,6 +2,35 @@ import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 
+export function setCursorActive(): void {
+  const cursor = document.getElementById('cursor');
+  if (!cursor) return;
+  cursor.classList.remove('idle');
+}
+
+export function setCursorIdle(): void {
+  const cursor = document.getElementById('cursor');
+  if (!cursor) return;
+  cursor.classList.add('idle');
+}
+
+export function initCursorIdleDetection(): void {
+  // Start idle on mouse movement
+  document.addEventListener('mousemove', () => {
+    const cursor = document.getElementById('cursor');
+    if (cursor && !cursor.classList.contains('idle')) {
+      // If not already idle, set idle (mouse activity = not typing)
+      setCursorIdle();
+    }
+  });
+
+  // Set idle when window loses focus
+  window.addEventListener('blur', setCursorIdle);
+
+  // Start as idle
+  setCursorIdle();
+}
+
 export function render(garden: GardenState): void {
   const app = document.getElementById('app');
   if (!app) return;
@@ -13,6 +42,7 @@ export function render(garden: GardenState): void {
     <main class="container">
       <div id="typing-area" class="typing-area">
         <div id="words" class="words"></div>
+        <div id="cursor" class="cursor"></div>
       </div>
       <div id="stats" class="stats"></div>
     </main>
@@ -23,6 +53,9 @@ export function renderWords(state: TypingState): void {
   const wordsEl = document.getElementById('words');
   if (!wordsEl) return;
 
+  // Track if cursor should be at end of a character (right edge)
+  let cursorAtEnd = false;
+
   const wordElements = state.words.map((word, wordIndex) => {
     const typed = state.typed[wordIndex] ?? '';
     const isCurrentWord = wordIndex === state.currentWordIndex;
@@ -31,6 +64,7 @@ export function renderWords(state: TypingState): void {
     const chars = word.split('').map((char, charIndex) => {
       const typedChar = typed[charIndex];
       let className = 'char';
+      let dataAttr = '';
 
       if (typedChar === undefined) {
         className += isPastWord ? ' dim' : '';
@@ -40,25 +74,36 @@ export function renderWords(state: TypingState): void {
         className += ' incorrect';
       }
 
-      // Cursor position
+      // Mark cursor target (at start of this char)
       if (isCurrentWord && charIndex === state.currentCharIndex) {
-        className += ' cursor';
+        dataAttr = ' data-cursor-target="true"';
       }
 
-      return `<span class="${className}">${char}</span>`;
+      // Mark cursor at end of last typed char
+      if (isCurrentWord && charIndex === state.currentCharIndex - 1 && state.currentCharIndex === typed.length && typed.length <= word.length) {
+        dataAttr = ' data-cursor-target="true" data-cursor-end="true"';
+        cursorAtEnd = true;
+      }
+
+      return `<span class="${className}"${dataAttr}>${char}</span>`;
     });
 
     // Extra characters typed beyond word length
     if (typed.length > word.length) {
       const extra = typed.slice(word.length);
-      for (const char of extra) {
-        chars.push(`<span class="char extra incorrect">${char}</span>`);
-      }
-    }
+      for (let i = 0; i < extra.length; i++) {
+        const extraIndex = word.length + i;
+        const isLastTyped = extraIndex === typed.length - 1;
+        let dataAttr = '';
 
-    // Cursor at end of word
-    if (isCurrentWord && state.currentCharIndex >= word.length) {
-      chars.push(`<span class="char cursor"> </span>`);
+        // Cursor at end of last extra char
+        if (isCurrentWord && isLastTyped && state.currentCharIndex === typed.length) {
+          dataAttr = ' data-cursor-target="true" data-cursor-end="true"';
+          cursorAtEnd = true;
+        }
+
+        chars.push(`<span class="char extra incorrect"${dataAttr}>${extra[i]}</span>`);
+      }
     }
 
     const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}`;
@@ -66,6 +111,31 @@ export function renderWords(state: TypingState): void {
   });
 
   wordsEl.innerHTML = wordElements.join(' ');
+
+  // Position the cursor
+  updateCursorPosition(cursorAtEnd);
+}
+
+function updateCursorPosition(atEnd: boolean): void {
+  const cursor = document.getElementById('cursor');
+  const target = document.querySelector('[data-cursor-target="true"]');
+  const wordsEl = document.getElementById('words');
+
+  if (!cursor || !wordsEl) return;
+
+  if (!target) {
+    cursor.style.opacity = '0';
+    return;
+  }
+
+  const wordsRect = wordsEl.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+
+  cursor.style.opacity = '1';
+  // Position at right edge if at end of typed content, otherwise left edge
+  const leftPos = atEnd ? targetRect.right - wordsRect.left : targetRect.left - wordsRect.left;
+  cursor.style.left = `${leftPos}px`;
+  cursor.style.top = `${targetRect.top - wordsRect.top}px`;
 }
 
 export function renderStats(wpm: number, accuracy: number): void {
@@ -76,6 +146,11 @@ export function renderStats(wpm: number, accuracy: number): void {
     <span class="stat">${wpm} wpm</span>
     <span class="stat">${accuracy}% acc</span>
   `;
+
+  // Trigger fade-in animation
+  requestAnimationFrame(() => {
+    statsEl.classList.add('visible');
+  });
 }
 
 export function renderUpgradeChoice(

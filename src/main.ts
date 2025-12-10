@@ -3,7 +3,7 @@ import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
 import type { TypingState } from './typing.ts';
 import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats } from './ui.ts';
+import { render, renderStats, initCursorIdleDetection } from './ui.ts';
 import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
@@ -48,4 +48,5 @@ function startNewRun(): void {
 
 // Initial render and start
 render(garden);
+initCursorIdleDetection();
 startNewRun();

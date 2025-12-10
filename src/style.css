@@ -58,6 +58,7 @@ body {
 }
 
 .words {
+  position: relative;
   font-size: 1.25rem;
   line-height: 2;
   user-select: none;
@@ -90,20 +91,24 @@ body {
 }
 
 /* Cursor */
-.char.cursor::before {
-  content: '';
+.cursor {
   position: absolute;
-  left: 0;
-  top: 0.1em;
   width: 2px;
-  height: 1.2em;
+  height: 1.4em;
   background-color: var(--accent);
+  pointer-events: none;
+  transition: left 0.08s ease-out, top 0.08s ease-out, opacity 0.15s ease;
+  will-change: left, top;
+}
+
+/* Blink only when idle */
+.cursor.idle {
   animation: blink 1s ease-in-out infinite;
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 /* Past words */
@@ -122,6 +127,14 @@ body {
   gap: 1.5rem;
   font-size: 0.875rem;
   color: var(--text-dim);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.stats.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .stat {
