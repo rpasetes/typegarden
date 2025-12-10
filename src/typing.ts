@@ -6,6 +6,7 @@ export interface TypingState {
   currentWordIndex: number;
   currentCharIndex: number;
   typed: string[];
+  mistaken: boolean[];  // tracks which words have errors or were incomplete
   errors: number;
   startTime: number | null;
   endTime: number | null;
@@ -22,6 +23,7 @@ export function createTypingState(words: string[]): TypingState {
     currentWordIndex: 0,
     currentCharIndex: 0,
     typed: words.map(() => ''),
+    mistaken: words.map(() => false),
     errors: 0,
     startTime: null,
     endTime: null,
@@ -60,13 +62,21 @@ export function calculateAccuracy(state: TypingState): number {
 function handleKeydown(e: KeyboardEvent): void {
   if (!currentState) return;
 
-  // Ignore modifier keys and special combinations
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-
   const { key } = e;
 
   // Mark cursor as active (stop blinking)
   setCursorActive();
+
+  // Handle Option+Backspace (delete entire word)
+  if (key === 'Backspace' && e.altKey) {
+    e.preventDefault();
+    handleOptionBackspace();
+    renderWords(currentState);
+    return;
+  }
+
+  // Ignore other modifier key combinations
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
 
   // Start timer on first keystroke
   if (currentState.startTime === null && key.length === 1) {
@@ -98,29 +108,86 @@ function handleKeydown(e: KeyboardEvent): void {
   }
 }
 
+function isWordCorrect(wordIndex: number): boolean {
+  if (!currentState) return false;
+  const word = currentState.words[wordIndex] ?? '';
+  const typed = currentState.typed[wordIndex] ?? '';
+  return typed === word;
+}
+
 function handleBackspace(): void {
   if (!currentState) return;
 
-  const currentTyped = currentState.typed[currentState.currentWordIndex] ?? '';
+  const wordIndex = currentState.currentWordIndex;
+  const currentTyped = currentState.typed[wordIndex] ?? '';
 
   if (currentTyped.length > 0) {
     // Delete last character from current word
-    currentState.typed[currentState.currentWordIndex] = currentTyped.slice(0, -1);
+    currentState.typed[wordIndex] = currentTyped.slice(0, -1);
     currentState.currentCharIndex = Math.max(0, currentState.currentCharIndex - 1);
+
+    // Clear mistaken flag if we're editing this word
+    currentState.mistaken[wordIndex] = false;
+  } else if (wordIndex > 0) {
+    // At start of word with nothing typed — try to go back
+    const prevIndex = wordIndex - 1;
+
+    // Can only go back if previous word is mistaken (not a checkpoint)
+    if (currentState.mistaken[prevIndex] || !isWordCorrect(prevIndex)) {
+      currentState.currentWordIndex = prevIndex;
+      const prevTyped = currentState.typed[prevIndex] ?? '';
+      currentState.currentCharIndex = prevTyped.length;
+      // Clear mistaken flag — player is correcting it
+      currentState.mistaken[prevIndex] = false;
+    }
+    // If previous word is correct, do nothing (checkpoint)
   }
-  // Note: Can't go back to previous words (per spec)
+}
+
+function handleOptionBackspace(): void {
+  if (!currentState) return;
+
+  const wordIndex = currentState.currentWordIndex;
+  const currentTyped = currentState.typed[wordIndex] ?? '';
+
+  if (currentTyped.length > 0) {
+    // Delete entire current word
+    currentState.typed[wordIndex] = '';
+    currentState.currentCharIndex = 0;
+    currentState.mistaken[wordIndex] = false;
+  } else if (wordIndex > 0) {
+    // Already empty — go back and delete previous word (if mistaken)
+    const prevIndex = wordIndex - 1;
+
+    if (currentState.mistaken[prevIndex] || !isWordCorrect(prevIndex)) {
+      currentState.currentWordIndex = prevIndex;
+      currentState.typed[prevIndex] = '';
+      currentState.currentCharIndex = 0;
+      currentState.mistaken[prevIndex] = false;
+    }
+  }
 }
 
 function handleSpace(): void {
   if (!currentState) return;
 
-  const currentTyped = currentState.typed[currentState.currentWordIndex] ?? '';
+  const wordIndex = currentState.currentWordIndex;
+  const currentWord = currentState.words[wordIndex] ?? '';
+  const currentTyped = currentState.typed[wordIndex] ?? '';
 
   // Only advance if something was typed
   if (currentTyped.length === 0) return;
 
+  // Check if word is mistaken (incomplete or has errors)
+  const isIncomplete = currentTyped.length < currentWord.length;
+  const hasErrors = currentTyped.split('').some((char, i) => char !== currentWord[i]);
+
+  if (isIncomplete || hasErrors) {
+    currentState.mistaken[wordIndex] = true;
+  }
+
   // Check if we're at the last word
-  if (currentState.currentWordIndex >= currentState.words.length - 1) {
+  if (wordIndex >= currentState.words.length - 1) {
     // Complete the run
     completeRun();
     return;

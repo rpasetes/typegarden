@@ -67,10 +67,13 @@ export function renderWords(state: TypingState): void {
       let dataAttr = '';
 
       if (typedChar === undefined) {
-        className += isPastWord ? ' dim' : '';
+        // Untyped: gray/dim to prompt typing
+        className += ' untyped';
       } else if (typedChar === char) {
+        // Correct: white
         className += ' correct';
       } else {
+        // Incorrect: red
         className += ' incorrect';
       }
 
@@ -106,7 +109,8 @@ export function renderWords(state: TypingState): void {
       }
     }
 
-    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}`;
+    const isMistaken = state.mistaken[wordIndex] ?? false;
+    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
     return `<span class="${wordClass}">${chars.join('')}</span>`;
   });
 
