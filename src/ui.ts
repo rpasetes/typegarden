@@ -76,6 +76,11 @@ export function renderStats(wpm: number, accuracy: number): void {
     <span class="stat">${wpm} wpm</span>
     <span class="stat">${accuracy}% acc</span>
   `;
+
+  // Trigger fade-in animation
+  requestAnimationFrame(() => {
+    statsEl.classList.add('visible');
+  });
 }
 
 export function renderUpgradeChoice(

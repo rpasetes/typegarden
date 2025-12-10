@@ -122,6 +122,14 @@ body {
   gap: 1.5rem;
   font-size: 0.875rem;
   color: var(--text-dim);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.stats.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .stat {
