@@ -137,6 +137,8 @@ function handleBackspace(): void {
       currentState.currentWordIndex = prevIndex;
       const prevTyped = currentState.typed[prevIndex] ?? '';
       currentState.currentCharIndex = prevTyped.length;
+      // Clear mistaken flag — player is correcting it
+      currentState.mistaken[prevIndex] = false;
     }
     // If previous word is correct, do nothing (checkpoint)
   }
