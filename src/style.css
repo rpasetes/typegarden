@@ -58,6 +58,7 @@ body {
 }
 
 .words {
+  position: relative;
   font-size: 1.25rem;
   line-height: 2;
   user-select: none;
@@ -90,20 +91,27 @@ body {
 }
 
 /* Cursor */
-.char.cursor::before {
+.cursor {
+  position: absolute;
+  width: 2px;
+  height: 1.4em;
+  background-color: var(--accent);
+  pointer-events: none;
+  transition: left 0.08s ease-out, top 0.08s ease-out, opacity 0.15s ease;
+  will-change: left, top;
+}
+
+.cursor::after {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0.1em;
-  width: 2px;
-  height: 1.2em;
-  background-color: var(--accent);
+  inset: 0;
+  background-color: inherit;
   animation: blink 1s ease-in-out infinite;
 }
 
 @keyframes blink {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  50% { opacity: 0.3; }
 }
 
 /* Past words */
