@@ -1,5 +1,5 @@
 import type { GardenState } from './garden.ts';
-import { renderWords } from './ui.ts';
+import { renderWords, setCursorActive } from './ui.ts';
 
 export interface TypingState {
   words: string[];
@@ -64,6 +64,9 @@ function handleKeydown(e: KeyboardEvent): void {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
   const { key } = e;
+
+  // Mark cursor as active (stop blinking)
+  setCursorActive();
 
   // Start timer on first keystroke
   if (currentState.startTime === null && key.length === 1) {

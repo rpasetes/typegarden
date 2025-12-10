@@ -2,6 +2,35 @@ import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 
+export function setCursorActive(): void {
+  const cursor = document.getElementById('cursor');
+  if (!cursor) return;
+  cursor.classList.remove('idle');
+}
+
+export function setCursorIdle(): void {
+  const cursor = document.getElementById('cursor');
+  if (!cursor) return;
+  cursor.classList.add('idle');
+}
+
+export function initCursorIdleDetection(): void {
+  // Start idle on mouse movement
+  document.addEventListener('mousemove', () => {
+    const cursor = document.getElementById('cursor');
+    if (cursor && !cursor.classList.contains('idle')) {
+      // If not already idle, set idle (mouse activity = not typing)
+      setCursorIdle();
+    }
+  });
+
+  // Set idle when window loses focus
+  window.addEventListener('blur', setCursorIdle);
+
+  // Start as idle
+  setCursorIdle();
+}
+
 export function render(garden: GardenState): void {
   const app = document.getElementById('app');
   if (!app) return;

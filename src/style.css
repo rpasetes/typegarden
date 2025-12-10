@@ -101,11 +101,8 @@ body {
   will-change: left, top;
 }
 
-.cursor::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-color: inherit;
+/* Blink only when idle */
+.cursor.idle {
   animation: blink 1s ease-in-out infinite;
 }
 
