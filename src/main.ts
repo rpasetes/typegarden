@@ -1,13 +1,51 @@
 import './style.css';
-import { initTyping } from './typing.ts';
-import { loadGarden, initGarden } from './garden.ts';
-import { render } from './ui.ts';
+import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
+import type { TypingState } from './typing.ts';
+import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
+import type { GardenState } from './garden.ts';
+import { render, renderStats } from './ui.ts';
+import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
-const garden = loadGarden() ?? initGarden();
+let garden = loadGarden() ?? initGarden();
 
-// Render initial UI
+function onRunComplete(state: TypingState): void {
+  const wpm = calculateWPM(state);
+  const accuracy = calculateAccuracy(state);
+  const wordCount = state.words.length;
+  const duration = (state.endTime ?? Date.now()) - (state.startTime ?? Date.now());
+
+  // Show final stats
+  renderStats(wpm, accuracy);
+
+  // Save run to garden
+  garden = addRun(garden, {
+    timestamp: Date.now(),
+    wpm,
+    accuracy,
+    wordCount,
+    duration,
+  });
+  saveGarden(garden);
+
+  // Start new run after a brief pause
+  setTimeout(() => {
+    startNewRun();
+  }, 2000);
+}
+
+function startNewRun(): void {
+  // Render fresh UI
+  render(garden);
+
+  // Generate words — for now, 25 common words
+  // TODO: Tutorial flow will replace this
+  const words = generateWords({ type: 'common', count: 25 });
+
+  // Start typing session
+  startTyping(words, onRunComplete);
+}
+
+// Initial render and start
 render(garden);
-
-// Initialize typing engine
-initTyping(garden);
+startNewRun();
