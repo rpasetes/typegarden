@@ -146,6 +146,13 @@ function handleCharacter(char: string): void {
   if (char !== expectedChar) {
     currentState.errors++;
   }
+
+  // Auto-complete: if last word and typed length matches word length
+  const isLastWord = wordIndex === currentState.words.length - 1;
+  const newTypedLength = currentTyped.length + 1;
+  if (isLastWord && newTypedLength >= currentWord.length) {
+    completeRun();
+  }
 }
 
 function completeRun(): void {
