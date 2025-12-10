@@ -73,6 +73,10 @@ body {
   transition: color 0.05s ease;
 }
 
+.char.untyped {
+  color: var(--text-dim);
+}
+
 .char.correct {
   color: var(--text-typed);
 }
@@ -84,10 +88,6 @@ body {
 .char.extra {
   color: var(--text-error);
   opacity: 0.7;
-}
-
-.char.dim {
-  color: var(--text-dim);
 }
 
 /* Cursor */
@@ -111,15 +111,7 @@ body {
   50% { opacity: 1; }
 }
 
-/* Past words */
-.word.past .char {
-  color: var(--text-dim);
-}
-
-.word.past .char.incorrect {
-  color: var(--text-error);
-  opacity: 0.6;
-}
+/* Past words - preserve typing state as-is */
 
 /* Stats */
 .stats {
