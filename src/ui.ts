@@ -109,7 +109,8 @@ export function renderWords(state: TypingState): void {
       }
     }
 
-    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}`;
+    const isMistaken = state.mistaken[wordIndex] ?? false;
+    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
     return `<span class="${wordClass}">${chars.join('')}</span>`;
   });
 

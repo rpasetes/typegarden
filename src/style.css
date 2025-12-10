@@ -113,6 +113,13 @@ body {
 
 /* Past words - preserve typing state as-is */
 
+/* Mistaken words */
+.word.mistaken {
+  text-decoration: underline;
+  text-decoration-color: var(--text-error);
+  text-underline-offset: 0.25em;
+}
+
 /* Stats */
 .stats {
   display: flex;

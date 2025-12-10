@@ -6,6 +6,7 @@ export interface TypingState {
   currentWordIndex: number;
   currentCharIndex: number;
   typed: string[];
+  mistaken: boolean[];  // tracks which words have errors or were incomplete
   errors: number;
   startTime: number | null;
   endTime: number | null;
@@ -22,6 +23,7 @@ export function createTypingState(words: string[]): TypingState {
     currentWordIndex: 0,
     currentCharIndex: 0,
     typed: words.map(() => ''),
+    mistaken: words.map(() => false),
     errors: 0,
     startTime: null,
     endTime: null,
@@ -114,13 +116,23 @@ function handleBackspace(): void {
 function handleSpace(): void {
   if (!currentState) return;
 
-  const currentTyped = currentState.typed[currentState.currentWordIndex] ?? '';
+  const wordIndex = currentState.currentWordIndex;
+  const currentWord = currentState.words[wordIndex] ?? '';
+  const currentTyped = currentState.typed[wordIndex] ?? '';
 
   // Only advance if something was typed
   if (currentTyped.length === 0) return;
 
+  // Check if word is mistaken (incomplete or has errors)
+  const isIncomplete = currentTyped.length < currentWord.length;
+  const hasErrors = currentTyped.split('').some((char, i) => char !== currentWord[i]);
+
+  if (isIncomplete || hasErrors) {
+    currentState.mistaken[wordIndex] = true;
+  }
+
   // Check if we're at the last word
-  if (currentState.currentWordIndex >= currentState.words.length - 1) {
+  if (wordIndex >= currentState.words.length - 1) {
     // Complete the run
     completeRun();
     return;
