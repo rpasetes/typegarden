@@ -9,6 +9,10 @@
   --text-dim: #665c54;
   --accent: #fabd2f;
   --gray: #928374;
+
+  /* Typography scale */
+  --font-size-words: 1.75rem;
+  --line-height-words: 2;
 }
 
 /* Alternative palette (cosmetic.palette upgrade) */
@@ -43,7 +47,7 @@ body {
 
 #app {
   width: 100%;
-  max-width: 900px;
+  max-width: 1000px;
   padding: 2rem;
 }
 
@@ -60,9 +64,12 @@ body {
 
 .words {
   position: relative;
-  font-size: 1.25rem;
-  line-height: 2;
+  font-size: var(--font-size-words);
+  line-height: var(--line-height-words);
   user-select: none;
+  /* Constrain to 3 lines */
+  max-height: calc(var(--font-size-words) * var(--line-height-words) * 3);
+  overflow: hidden;
 }
 
 .word {
@@ -91,11 +98,11 @@ body {
   opacity: 0.7;
 }
 
-/* Cursor */
+/* Cursor — height anchored to font size via em */
 .cursor {
   position: absolute;
   width: 2px;
-  height: 1.4em;
+  height: calc(var(--font-size-words) * 1.3);
   background-color: var(--accent);
   pointer-events: none;
   transition: left 0.08s ease-out, top 0.08s ease-out, opacity 0.15s ease;
@@ -230,12 +237,12 @@ body {
 
 /* Responsive */
 @media (max-width: 640px) {
-  #app {
-    padding: 1rem;
+  :root {
+    --font-size-words: 1.2rem;
   }
 
-  .words {
-    font-size: 1.1rem;
+  #app {
+    padding: 1rem;
   }
 
   .upgrade-option {
