@@ -57,9 +57,12 @@ body {
   gap: 2rem;
 }
 
-/* Typing Area */
+/* Typing Area — acts as the viewport */
 .typing-area {
   position: relative;
+  /* Viewport clips to 3 lines */
+  max-height: calc(var(--font-size-words) * var(--line-height-words) * 3);
+  overflow: hidden;
 }
 
 .words {
@@ -67,9 +70,8 @@ body {
   font-size: var(--font-size-words);
   line-height: var(--line-height-words);
   user-select: none;
-  /* Constrain to 3 lines */
-  max-height: calc(var(--font-size-words) * var(--line-height-words) * 3);
-  overflow: hidden;
+  /* Content scrolls via transform */
+  transition: transform 0.15s ease-out;
 }
 
 .word {

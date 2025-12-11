@@ -116,13 +116,14 @@ export function renderWords(state: TypingState): void {
 
   wordsEl.innerHTML = wordElements.join(' ');
 
-  // Position the cursor
+  // Scroll first, then position cursor (so cursor reflects post-scroll position)
+  scrollToCurrentWord();
   updateCursorPosition(cursorAtEnd);
 }
 
 function updateCursorPosition(atEnd: boolean): void {
   const cursor = document.getElementById('cursor');
-  const target = document.querySelector('[data-cursor-target="true"]');
+  const target = document.querySelector('[data-cursor-target="true"]') as HTMLElement | null;
   const wordsEl = document.getElementById('words');
 
   if (!cursor || !wordsEl) return;
@@ -132,14 +133,53 @@ function updateCursorPosition(atEnd: boolean): void {
     return;
   }
 
-  const wordsRect = wordsEl.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
+  // Use offsetTop/offsetLeft which ignore transforms
+  // Then manually account for the scroll offset
+  const style = getComputedStyle(wordsEl);
+  const lineHeightPx = parseFloat(style.lineHeight);
+  const scrollOffset = scrolledToLine * lineHeightPx;
+
+  // Calculate cursor position directly from offset values
+  const targetLeft = target.offsetLeft;
+  const targetTop = target.offsetTop - scrollOffset;
 
   cursor.style.opacity = '1';
-  // Position at right edge if at end of typed content, otherwise left edge
-  const leftPos = atEnd ? targetRect.right - wordsRect.left : targetRect.left - wordsRect.left;
-  cursor.style.left = `${leftPos}px`;
-  cursor.style.top = `${targetRect.top - wordsRect.top}px`;
+  cursor.style.left = atEnd
+    ? `${targetLeft + target.offsetWidth}px`
+    : `${targetLeft}px`;
+  cursor.style.top = `${targetTop}px`;
+}
+
+// Track which line we're scrolled to (persists across renders)
+let scrolledToLine = 0;
+
+export function resetScroll(): void {
+  scrolledToLine = 0;
+}
+
+function scrollToCurrentWord(): void {
+  const wordsEl = document.getElementById('words');
+  const currentWord = document.querySelector('.word.current') as HTMLElement | null;
+
+  if (!wordsEl || !currentWord) return;
+
+  // Get line height in pixels
+  const style = getComputedStyle(wordsEl);
+  const lineHeightPx = parseFloat(style.lineHeight);
+
+  // offsetTop gives position in natural document flow (ignores transforms)
+  const wordTop = currentWord.offsetTop;
+  const currentLine = Math.floor(wordTop / lineHeightPx);
+
+  // Keep current word always on line 2 (center)
+  // scrolledToLine + 1 = center line, so scrolledToLine = currentLine - 1
+  const targetScroll = Math.max(0, currentLine - 1);
+  if (targetScroll !== scrolledToLine) {
+    scrolledToLine = targetScroll;
+  }
+
+  const offset = -scrolledToLine * lineHeightPx;
+  wordsEl.style.transform = `translateY(${offset}px)`;
 }
 
 export function renderStats(wpm: number, accuracy: number): void {

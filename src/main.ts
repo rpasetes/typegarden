@@ -3,7 +3,7 @@ import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
 import type { TypingState } from './typing.ts';
 import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, initCursorIdleDetection } from './ui.ts';
+import { render, renderStats, initCursorIdleDetection, resetScroll } from './ui.ts';
 import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
@@ -37,10 +37,11 @@ function onRunComplete(state: TypingState): void {
 function startNewRun(): void {
   // Render fresh UI
   render(garden);
+  resetScroll();
 
-  // Generate words — for now, 25 common words
+  // Generate words — for now, 50 common words
   // TODO: Tutorial flow will replace this
-  const words = generateWords({ type: 'common', count: 25 });
+  const words = generateWords({ type: 'common', count: 50 });
 
   // Start typing session
   startTyping(words, onRunComplete);
