@@ -52,6 +52,7 @@ body {
 }
 
 .container {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2rem;
@@ -130,20 +131,28 @@ body {
   text-underline-offset: 0.25em;
 }
 
-/* Stats */
+/* Stats — positioned above typing area without affecting layout */
 .stats {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(-100%) translateY(-1rem);
   display: flex;
   gap: 1.5rem;
   font-size: 0.875rem;
   color: var(--gray);
   opacity: 0;
-  transform: translateY(-8px);
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  transition: opacity 0.4s ease;
 }
 
 .stats.visible {
   opacity: 1;
-  transform: translateY(0);
+}
+
+/* Continue prompt */
+.continue-prompt {
+  color: var(--text-dim);
+  font-size: var(--font-size-words);
 }
 
 .stat {
