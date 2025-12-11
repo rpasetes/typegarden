@@ -25,6 +25,8 @@ function onRunComplete(state: TypingState): void {
     accuracy,
     wordCount,
     duration,
+    correctKeystrokes: state.correctKeystrokes,
+    incorrectKeystrokes: state.incorrectKeystrokes,
   });
   saveGarden(garden);
 
