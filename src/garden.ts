@@ -6,6 +6,8 @@ export interface RunResult {
   accuracy: number;
   wordCount: number;
   duration: number;
+  correctKeystrokes: number;
+  incorrectKeystrokes: number;
 }
 
 export interface GardenState {

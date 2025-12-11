@@ -8,6 +8,8 @@ export interface TypingState {
   typed: string[];
   mistaken: boolean[];  // tracks which words have errors or were incomplete
   errors: number;
+  correctKeystrokes: number;
+  incorrectKeystrokes: number;
   startTime: number | null;
   endTime: number | null;
 }
@@ -25,6 +27,8 @@ export function createTypingState(words: string[]): TypingState {
     typed: words.map(() => ''),
     mistaken: words.map(() => false),
     errors: 0,
+    correctKeystrokes: 0,
+    incorrectKeystrokes: 0,
     startTime: null,
     endTime: null,
   };
@@ -40,23 +44,9 @@ export function calculateWPM(state: TypingState): number {
 }
 
 export function calculateAccuracy(state: TypingState): number {
-  let correct = 0;
-  let total = 0;
-
-  for (let i = 0; i < state.words.length; i++) {
-    const word = state.words[i];
-    const typed = state.typed[i];
-    if (!word || !typed) continue;
-
-    for (let j = 0; j < typed.length; j++) {
-      total++;
-      if (typed[j] === word[j]) {
-        correct++;
-      }
-    }
-  }
-
-  return total === 0 ? 100 : Math.round((correct / total) * 100);
+  const total = state.correctKeystrokes + state.incorrectKeystrokes;
+  if (total === 0) return 100;
+  return Math.round((state.correctKeystrokes / total) * 100);
 }
 
 function handleKeydown(e: KeyboardEvent): void {
@@ -211,9 +201,12 @@ function handleCharacter(char: string): void {
   currentState.typed[wordIndex] = currentTyped + char;
   currentState.currentCharIndex = currentTyped.length + 1;
 
-  // Track errors
+  // Track keystrokes
   const expectedChar = currentWord[currentTyped.length];
-  if (char !== expectedChar) {
+  if (char === expectedChar) {
+    currentState.correctKeystrokes++;
+  } else {
+    currentState.incorrectKeystrokes++;
     currentState.errors++;
   }
 
