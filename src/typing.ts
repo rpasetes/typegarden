@@ -12,12 +12,17 @@ export interface TypingState {
   incorrectKeystrokes: number;
   startTime: number | null;
   endTime: number | null;
+  activeTime: number;  // accumulated active typing time (excludes AFK gaps)
+  lastKeystrokeTime: number | null;  // for tracking gaps between keystrokes
 }
 
 export type TypingCompleteCallback = (state: TypingState) => void;
 
 let currentState: TypingState | null = null;
 let onCompleteCallback: TypingCompleteCallback | null = null;
+
+// Max gap between keystrokes before considered AFK (5 seconds)
+const AFK_THRESHOLD_MS = 5000;
 
 export function createTypingState(words: string[]): TypingState {
   return {
@@ -31,6 +36,8 @@ export function createTypingState(words: string[]): TypingState {
     incorrectKeystrokes: 0,
     startTime: null,
     endTime: null,
+    activeTime: 0,
+    lastKeystrokeTime: null,
   };
 }
 
@@ -47,6 +54,22 @@ export function calculateAccuracy(state: TypingState): number {
   const total = state.correctKeystrokes + state.incorrectKeystrokes;
   if (total === 0) return 100;
   return Math.round((state.correctKeystrokes / total) * 100);
+}
+
+function trackActiveTime(): void {
+  if (!currentState) return;
+
+  const now = Date.now();
+
+  if (currentState.lastKeystrokeTime !== null) {
+    const gap = now - currentState.lastKeystrokeTime;
+    // Only count time if gap is within threshold (not AFK)
+    if (gap <= AFK_THRESHOLD_MS) {
+      currentState.activeTime += gap;
+    }
+  }
+
+  currentState.lastKeystrokeTime = now;
 }
 
 function handleKeydown(e: KeyboardEvent): void {
@@ -72,6 +95,9 @@ function handleKeydown(e: KeyboardEvent): void {
   if (currentState.startTime === null && key.length === 1) {
     currentState.startTime = Date.now();
   }
+
+  // Track active typing time (excludes AFK gaps)
+  trackActiveTime();
 
   // Handle backspace
   if (key === 'Backspace') {
