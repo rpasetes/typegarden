@@ -227,6 +227,24 @@ export function renderContinuePrompt(): void {
   wordsEl.style.transform = 'translateY(0)';
 }
 
+export function fadeOutWords(): Promise<void> {
+  return new Promise((resolve) => {
+    const wordsEl = document.getElementById('words');
+    if (!wordsEl) {
+      resolve();
+      return;
+    }
+
+    // Add fade-out class
+    wordsEl.classList.add('fade-out');
+
+    // Resolve after transition completes (500ms) + small delay
+    setTimeout(() => {
+      resolve();
+    }, 600);
+  });
+}
+
 export function clearStats(): void {
   const statsEl = document.getElementById('stats');
   if (!statsEl) return;
