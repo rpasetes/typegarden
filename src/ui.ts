@@ -40,12 +40,12 @@ export function render(garden: GardenState): void {
 
   app.innerHTML = `
     <main class="container">
-      <div id="progress" class="progress"></div>
+      <div id="progress" class="above-viewport progress"></div>
       <div id="typing-area" class="typing-area">
         <div id="words" class="words"></div>
         <div id="cursor" class="cursor"></div>
       </div>
-      <div id="stats" class="stats"></div>
+      <div id="stats" class="above-viewport stats"></div>
     </main>
   `;
 }
