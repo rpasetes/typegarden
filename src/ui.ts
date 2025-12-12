@@ -250,23 +250,30 @@ export function showFocusOverlay(): void {
   // Don't show if already visible
   if (document.querySelector('.focus-overlay')) return;
 
+  const typingArea = document.getElementById('typing-area');
+  if (!typingArea) return;
+
   const overlay = document.createElement('div');
-  overlay.className = 'focus-overlay';
+  overlay.className = 'focus-overlay fade-in';
   overlay.innerHTML = '<p class="focus-overlay-message">click here or press a key to focus</p>';
 
-  // Remove on click
+  // Remove on click with fade
   overlay.addEventListener('click', () => {
-    overlay.remove();
+    hideFocusOverlay();
   });
 
-  document.body.appendChild(overlay);
+  typingArea.appendChild(overlay);
 }
 
 export function hideFocusOverlay(): void {
   const overlay = document.querySelector('.focus-overlay');
-  if (overlay) {
+  if (!overlay) return;
+
+  // Fade out before removing
+  overlay.classList.add('fade-out');
+  setTimeout(() => {
     overlay.remove();
-  }
+  }, 200); // Match transition duration
 }
 
 export function renderUpgradeChoice(

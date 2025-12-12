@@ -180,9 +180,9 @@ body {
   transition: color 0.2s ease;
 }
 
-/* Focus overlay - shown only on blur */
+/* Focus overlay - covers only the typing viewport */
 .focus-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(40, 40, 40, 0.95);
   display: flex;
@@ -190,7 +190,16 @@ body {
   justify-content: center;
   z-index: 100;
   cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.focus-overlay.fade-in {
   animation: fadeIn 0.2s ease;
+}
+
+.focus-overlay.fade-out {
+  opacity: 0;
 }
 
 .focus-overlay-message {
