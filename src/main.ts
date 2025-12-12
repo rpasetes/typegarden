@@ -3,7 +3,7 @@ import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
 import type { TypingState } from './typing.ts';
 import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, renderContinuePrompt, clearStats, initCursorIdleDetection, resetScroll } from './ui.ts';
+import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll } from './ui.ts';
 import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
@@ -20,7 +20,8 @@ function onRunComplete(state: TypingState): void {
   // Accumulate only active typing time (excludes AFK)
   sessionTotalTime += state.activeTime;
 
-  // Show final stats above typing area
+  // Hide progress, show final stats above typing area
+  hideProgress();
   renderStats(wpm, accuracy, duration, state.activeTime, sessionTotalTime);
 
   // Save run to garden
