@@ -184,7 +184,7 @@ body {
 .focus-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(40, 40, 40, 0.95);
+  background: rgba(40, 40, 40, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
