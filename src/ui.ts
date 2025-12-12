@@ -117,8 +117,8 @@ export function renderWords(state: TypingState): void {
 
   wordsEl.innerHTML = wordElements.join(' ');
 
-  // Update progress indicator
-  renderProgress(state.currentWordIndex + 1, state.words.length);
+  // Update progress indicator (shows completed words, not current)
+  renderProgress(state.currentWordIndex, state.words.length);
 
   // Scroll first, then position cursor (so cursor reflects post-scroll position)
   scrollToCurrentWord();
