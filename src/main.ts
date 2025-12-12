@@ -21,7 +21,7 @@ function onRunComplete(state: TypingState): void {
   sessionTotalTime += state.activeTime;
 
   // Show final stats above typing area
-  renderStats(wpm, accuracy, duration, sessionTotalTime);
+  renderStats(wpm, accuracy, duration, state.activeTime, sessionTotalTime);
 
   // Save run to garden
   garden = addRun(garden, {

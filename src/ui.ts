@@ -190,14 +190,17 @@ function formatDuration(ms: number): string {
   return `${min}:${sec.toString().padStart(2, '0')}`;
 }
 
-export function renderStats(wpm: number, accuracy: number, duration: number, sessionTotal: number): void {
+export function renderStats(wpm: number, accuracy: number, duration: number, activeTime: number, sessionTotal: number): void {
   const statsEl = document.getElementById('stats');
   if (!statsEl) return;
+
+  const afkTime = duration - activeTime;
+  const afkDisplay = afkTime > 500 ? ` (${formatDuration(afkTime)} afk)` : '';
 
   statsEl.innerHTML = `
     <span class="stat">${wpm} wpm</span>
     <span class="stat">${accuracy}% acc</span>
-    <span class="stat">${formatDuration(duration)}</span>
+    <span class="stat">${formatDuration(duration)}${afkDisplay}</span>
     <span class="stat">${formatDuration(sessionTotal)} total</span>
   `;
 
