@@ -17,8 +17,8 @@ function onRunComplete(state: TypingState): void {
   const wordCount = state.words.length;
   const duration = (state.endTime ?? Date.now()) - (state.startTime ?? Date.now());
 
-  // Accumulate session time
-  sessionTotalTime += duration;
+  // Accumulate only active typing time (excludes AFK)
+  sessionTotalTime += state.activeTime;
 
   // Show final stats above typing area
   renderStats(wpm, accuracy, duration, sessionTotalTime);
