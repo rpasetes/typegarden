@@ -31,7 +31,7 @@ function onRunComplete(state: TypingState): void {
   });
   saveGarden(garden);
 
-  // Show continue prompt and wait for Enter
+  // Show continue prompt and wait for space
   renderContinuePrompt();
   waitingForContinue = true;
 }
