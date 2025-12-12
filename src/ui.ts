@@ -40,11 +40,12 @@ export function render(garden: GardenState): void {
 
   app.innerHTML = `
     <main class="container">
+      <div id="progress" class="above-viewport progress"></div>
       <div id="typing-area" class="typing-area">
         <div id="words" class="words"></div>
         <div id="cursor" class="cursor"></div>
       </div>
-      <div id="stats" class="stats"></div>
+      <div id="stats" class="above-viewport stats"></div>
     </main>
   `;
 }
@@ -115,6 +116,9 @@ export function renderWords(state: TypingState): void {
   });
 
   wordsEl.innerHTML = wordElements.join(' ');
+
+  // Update progress indicator (shows completed words, not current)
+  renderProgress(state.currentWordIndex, state.words.length);
 
   // Scroll first, then position cursor (so cursor reflects post-scroll position)
   scrollToCurrentWord();
@@ -227,6 +231,19 @@ export function clearStats(): void {
   if (!statsEl) return;
   statsEl.classList.remove('visible');
   statsEl.innerHTML = '';
+}
+
+export function renderProgress(current: number, total: number): void {
+  const progressEl = document.getElementById('progress');
+  if (!progressEl) return;
+  progressEl.textContent = `${current}/${total}`;
+  progressEl.classList.add('visible');
+}
+
+export function hideProgress(): void {
+  const progressEl = document.getElementById('progress');
+  if (!progressEl) return;
+  progressEl.classList.remove('visible');
 }
 
 export function renderUpgradeChoice(

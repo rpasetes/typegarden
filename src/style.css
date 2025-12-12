@@ -131,12 +131,33 @@ body {
   text-underline-offset: 0.25em;
 }
 
-/* Stats — positioned above typing area without affecting layout */
-.stats {
+/*
+ * Floating elements above the centered viewport
+ * These use absolute positioning so they don't affect the container's
+ * height calculation, keeping the typing area vertically centered.
+ */
+.above-viewport {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translateY(-100%) translateY(-1rem);
+  /* Match the line spacing of the words (line-height: 2 = 1em padding above/below) */
+  transform: translateY(-100%);
+}
+
+/* Progress indicator */
+.progress {
+  font-size: var(--font-size-words);
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.progress.visible {
+  opacity: 1;
+}
+
+/* Stats */
+.stats {
   display: flex;
   gap: 1.5rem;
   font-size: 0.875rem;
