@@ -3,7 +3,7 @@ import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
 import type { TypingState } from './typing.ts';
 import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeOutWords } from './ui.ts';
+import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeOutWords, fadeOutStats, fadeInWords, prepareWordsFadeIn } from './ui.ts';
 import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
@@ -50,7 +50,7 @@ async function onRunComplete(state: TypingState): Promise<void> {
   waitingForContinue = true;
 }
 
-function handleContinue(e: KeyboardEvent): void {
+async function handleContinue(e: KeyboardEvent): Promise<void> {
   // Hide overlay on any keypress
   hideFocusOverlay();
 
@@ -59,6 +59,9 @@ function handleContinue(e: KeyboardEvent): void {
 
   e.preventDefault();
   waitingForContinue = false;
+
+  // Fade out stats before starting new run
+  await fadeOutStats();
   clearStats();
   startNewRun();
 }
@@ -68,6 +71,9 @@ function startNewRun(): void {
   render(garden);
   resetScroll();
 
+  // Prepare words element for fade-in transition
+  prepareWordsFadeIn();
+
   // Generate words — for now, 50 common words
   // TODO: Tutorial flow will replace this
   const words = generateWords({ type: 'common', count: 50 });
@@ -75,8 +81,13 @@ function startNewRun(): void {
   // Mark run as active
   isRunActive = true;
 
-  // Start typing session
+  // Start typing session (this calls renderWords)
   startTyping(words, onRunComplete);
+
+  // Fade in words after initial render
+  requestAnimationFrame(() => {
+    fadeInWords();
+  });
 }
 
 export function getIsRunActive(): boolean {

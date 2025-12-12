@@ -247,6 +247,44 @@ export function fadeOutWords(): Promise<void> {
   });
 }
 
+export function fadeOutStats(): Promise<void> {
+  return new Promise((resolve) => {
+    const statsEl = document.getElementById('stats');
+    const wordsEl = document.getElementById('words');
+
+    // Fade out stats
+    if (statsEl) {
+      statsEl.classList.remove('visible');
+    }
+
+    // Fade out continue prompt
+    if (wordsEl) {
+      wordsEl.classList.add('fade-out');
+    }
+
+    // Resolve after transition completes (400ms from stats CSS)
+    setTimeout(() => {
+      resolve();
+    }, 400);
+  });
+}
+
+export function fadeInWords(): void {
+  const wordsEl = document.getElementById('words');
+  if (!wordsEl) return;
+
+  // Remove fade-out class to fade in
+  wordsEl.classList.remove('fade-out');
+}
+
+export function prepareWordsFadeIn(): void {
+  const wordsEl = document.getElementById('words');
+  if (!wordsEl) return;
+
+  // Add fade-out class before initial render (will be removed to fade in)
+  wordsEl.classList.add('fade-out');
+}
+
 export function clearStats(): void {
   const statsEl = document.getElementById('stats');
   if (!statsEl) return;
