@@ -9,6 +9,7 @@ import { generateWords } from './words.ts';
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
 let waitingForContinue = false;
+let sessionTotalTime = 0;
 
 function onRunComplete(state: TypingState): void {
   const wpm = calculateWPM(state);
@@ -16,8 +17,11 @@ function onRunComplete(state: TypingState): void {
   const wordCount = state.words.length;
   const duration = (state.endTime ?? Date.now()) - (state.startTime ?? Date.now());
 
+  // Accumulate session time
+  sessionTotalTime += duration;
+
   // Show final stats above typing area
-  renderStats(wpm, accuracy);
+  renderStats(wpm, accuracy, duration, sessionTotalTime);
 
   // Save run to garden
   garden = addRun(garden, {

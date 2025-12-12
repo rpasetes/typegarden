@@ -182,13 +182,23 @@ function scrollToCurrentWord(): void {
   wordsEl.style.transform = `translateY(${offset}px)`;
 }
 
-export function renderStats(wpm: number, accuracy: number): void {
+function formatDuration(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return `${min}:${sec.toString().padStart(2, '0')}`;
+}
+
+export function renderStats(wpm: number, accuracy: number, duration: number, sessionTotal: number): void {
   const statsEl = document.getElementById('stats');
   if (!statsEl) return;
 
   statsEl.innerHTML = `
     <span class="stat">${wpm} wpm</span>
     <span class="stat">${accuracy}% acc</span>
+    <span class="stat">${formatDuration(duration)}</span>
+    <span class="stat">${formatDuration(sessionTotal)} total</span>
   `;
 
   // Trigger fade-in animation
