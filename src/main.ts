@@ -3,19 +3,23 @@ import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
 import type { TypingState } from './typing.ts';
 import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll } from './ui.ts';
+import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay } from './ui.ts';
 import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
 let waitingForContinue = false;
 let sessionTotalTime = 0;
+let isRunActive = false;
 
 function onRunComplete(state: TypingState): void {
   const wpm = calculateWPM(state);
   const accuracy = calculateAccuracy(state);
   const wordCount = state.words.length;
   const duration = (state.endTime ?? Date.now()) - (state.startTime ?? Date.now());
+
+  // Mark run as inactive
+  isRunActive = false;
 
   // Accumulate only active typing time (excludes AFK)
   sessionTotalTime += state.activeTime;
@@ -42,6 +46,9 @@ function onRunComplete(state: TypingState): void {
 }
 
 function handleContinue(e: KeyboardEvent): void {
+  // Hide overlay on any keypress
+  hideFocusOverlay();
+
   if (!waitingForContinue) return;
   if (e.key !== ' ') return;
 
@@ -60,12 +67,24 @@ function startNewRun(): void {
   // TODO: Tutorial flow will replace this
   const words = generateWords({ type: 'common', count: 50 });
 
+  // Mark run as active
+  isRunActive = true;
+
   // Start typing session
   startTyping(words, onRunComplete);
+}
+
+export function getIsRunActive(): boolean {
+  return isRunActive;
 }
 
 // Initial render and start
 render(garden);
 initCursorIdleDetection();
 document.addEventListener('keydown', handleContinue);
+
+// Focus overlay - show only on blur, not on load
+window.addEventListener('blur', showFocusOverlay);
+window.addEventListener('focus', hideFocusOverlay);
+
 startNewRun();

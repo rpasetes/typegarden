@@ -180,6 +180,33 @@ body {
   transition: color 0.2s ease;
 }
 
+/* Focus overlay - covers only the typing viewport */
+.focus-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(40, 40, 40, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.focus-overlay.fade-in {
+  animation: fadeIn 0.2s ease;
+}
+
+.focus-overlay.fade-out {
+  opacity: 0;
+}
+
+.focus-overlay-message {
+  color: var(--text-dim);
+  font-size: 1rem;
+}
+
 /* Minimal mode (cosmetic.minimal upgrade) */
 .minimal .stats {
   display: none;

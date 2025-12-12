@@ -1,6 +1,7 @@
 import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
+import { getIsRunActive } from './main.ts';
 
 export function setCursorActive(): void {
   const cursor = document.getElementById('cursor');
@@ -244,6 +245,50 @@ export function hideProgress(): void {
   const progressEl = document.getElementById('progress');
   if (!progressEl) return;
   progressEl.classList.remove('visible');
+}
+
+export function showFocusOverlay(): void {
+  // Don't show if already visible
+  if (document.querySelector('.focus-overlay')) return;
+
+  const typingArea = document.getElementById('typing-area');
+  if (!typingArea) return;
+
+  // Hide progress indicator when unfocused
+  const progressEl = document.getElementById('progress');
+  if (progressEl) {
+    progressEl.classList.remove('visible');
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'focus-overlay fade-in';
+  overlay.innerHTML = '<p class="focus-overlay-message">click here or press a key to focus</p>';
+
+  // Remove on click with fade
+  overlay.addEventListener('click', () => {
+    hideFocusOverlay();
+  });
+
+  typingArea.appendChild(overlay);
+}
+
+export function hideFocusOverlay(): void {
+  const overlay = document.querySelector('.focus-overlay');
+  if (!overlay) return;
+
+  // Restore progress indicator only if we're in an active run
+  if (getIsRunActive()) {
+    const progressEl = document.getElementById('progress');
+    if (progressEl && progressEl.textContent) {
+      progressEl.classList.add('visible');
+    }
+  }
+
+  // Fade out before removing
+  overlay.classList.add('fade-out');
+  setTimeout(() => {
+    overlay.remove();
+  }, 200); // Match transition duration
 }
 
 export function renderUpgradeChoice(
