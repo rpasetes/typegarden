@@ -223,8 +223,84 @@ export function renderContinuePrompt(): void {
   // Hide cursor
   if (cursor) cursor.style.opacity = '0';
 
+  // Remove fade-out class and show continue prompt
+  wordsEl.classList.remove('fade-out');
   wordsEl.innerHTML = '<span class="continue-prompt">press space to keep typing</span>';
   wordsEl.style.transform = 'translateY(0)';
+}
+
+export function fadeOutWords(): Promise<void> {
+  return new Promise((resolve) => {
+    const wordsEl = document.getElementById('words');
+    if (!wordsEl) {
+      resolve();
+      return;
+    }
+
+    // Add fade-out class
+    wordsEl.classList.add('fade-out');
+
+    // Wait for CSS transition to complete
+    const onTransitionEnd = () => {
+      wordsEl.removeEventListener('transitionend', onTransitionEnd);
+      resolve();
+    };
+    wordsEl.addEventListener('transitionend', onTransitionEnd);
+
+    // Fallback timeout in case transitionend doesn't fire
+    setTimeout(() => {
+      wordsEl.removeEventListener('transitionend', onTransitionEnd);
+      resolve();
+    }, 400);
+  });
+}
+
+export function fadeOutStats(): Promise<void> {
+  return new Promise((resolve) => {
+    const statsEl = document.getElementById('stats');
+    const wordsEl = document.getElementById('words');
+
+    // Fade out stats
+    if (statsEl) {
+      statsEl.classList.remove('visible');
+
+      // Wait for stats CSS transition to complete
+      const onTransitionEnd = () => {
+        statsEl.removeEventListener('transitionend', onTransitionEnd);
+        resolve();
+      };
+      statsEl.addEventListener('transitionend', onTransitionEnd);
+
+      // Fallback timeout
+      setTimeout(() => {
+        statsEl.removeEventListener('transitionend', onTransitionEnd);
+        resolve();
+      }, 500);
+    } else {
+      resolve();
+    }
+
+    // Fade out continue prompt
+    if (wordsEl) {
+      wordsEl.classList.add('fade-out');
+    }
+  });
+}
+
+export function fadeInWords(): void {
+  const wordsEl = document.getElementById('words');
+  if (!wordsEl) return;
+
+  // Remove fade-out class to fade in
+  wordsEl.classList.remove('fade-out');
+}
+
+export function prepareWordsFadeIn(): void {
+  const wordsEl = document.getElementById('words');
+  if (!wordsEl) return;
+
+  // Add fade-out class before initial render (will be removed to fade in)
+  wordsEl.classList.add('fade-out');
 }
 
 export function clearStats(): void {
@@ -286,9 +362,19 @@ export function hideFocusOverlay(): void {
 
   // Fade out before removing
   overlay.classList.add('fade-out');
-  setTimeout(() => {
+
+  // Wait for CSS transition to complete
+  const onTransitionEnd = () => {
+    overlay.removeEventListener('transitionend', onTransitionEnd);
     overlay.remove();
-  }, 200); // Match transition duration
+  };
+  overlay.addEventListener('transitionend', onTransitionEnd);
+
+  // Fallback timeout in case transitionend doesn't fire
+  setTimeout(() => {
+    overlay.removeEventListener('transitionend', onTransitionEnd);
+    overlay.remove();
+  }, 300);
 }
 
 export function renderUpgradeChoice(
