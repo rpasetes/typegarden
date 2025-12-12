@@ -1,6 +1,7 @@
 import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
+import { getIsRunActive } from './main.ts';
 
 export function setCursorActive(): void {
   const cursor = document.getElementById('cursor');
@@ -275,10 +276,12 @@ export function hideFocusOverlay(): void {
   const overlay = document.querySelector('.focus-overlay');
   if (!overlay) return;
 
-  // Restore progress indicator when refocusing
-  const progressEl = document.getElementById('progress');
-  if (progressEl && progressEl.textContent) {
-    progressEl.classList.add('visible');
+  // Restore progress indicator only if we're in an active run
+  if (getIsRunActive()) {
+    const progressEl = document.getElementById('progress');
+    if (progressEl && progressEl.textContent) {
+      progressEl.classList.add('visible');
+    }
   }
 
   // Fade out before removing
