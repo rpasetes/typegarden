@@ -253,6 +253,12 @@ export function showFocusOverlay(): void {
   const typingArea = document.getElementById('typing-area');
   if (!typingArea) return;
 
+  // Hide progress indicator when unfocused
+  const progressEl = document.getElementById('progress');
+  if (progressEl) {
+    progressEl.classList.remove('visible');
+  }
+
   const overlay = document.createElement('div');
   overlay.className = 'focus-overlay fade-in';
   overlay.innerHTML = '<p class="focus-overlay-message">click here or press a key to focus</p>';
@@ -268,6 +274,12 @@ export function showFocusOverlay(): void {
 export function hideFocusOverlay(): void {
   const overlay = document.querySelector('.focus-overlay');
   if (!overlay) return;
+
+  // Restore progress indicator when refocusing
+  const progressEl = document.getElementById('progress');
+  if (progressEl && progressEl.textContent) {
+    progressEl.classList.add('visible');
+  }
 
   // Fade out before removing
   overlay.classList.add('fade-out');
