@@ -197,6 +197,25 @@ export function renderStats(wpm: number, accuracy: number): void {
   });
 }
 
+export function renderContinuePrompt(): void {
+  const wordsEl = document.getElementById('words');
+  const cursor = document.getElementById('cursor');
+  if (!wordsEl) return;
+
+  // Hide cursor
+  if (cursor) cursor.style.opacity = '0';
+
+  wordsEl.innerHTML = '<span class="continue-prompt">press space to keep typing</span>';
+  wordsEl.style.transform = 'translateY(0)';
+}
+
+export function clearStats(): void {
+  const statsEl = document.getElementById('stats');
+  if (!statsEl) return;
+  statsEl.classList.remove('visible');
+  statsEl.innerHTML = '';
+}
+
 export function renderUpgradeChoice(
   options: { id: string; name: string; description: string }[],
   onSelect: (id: string) => void

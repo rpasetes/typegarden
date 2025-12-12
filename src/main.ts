@@ -3,11 +3,12 @@ import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
 import type { TypingState } from './typing.ts';
 import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, initCursorIdleDetection, resetScroll } from './ui.ts';
+import { render, renderStats, renderContinuePrompt, clearStats, initCursorIdleDetection, resetScroll } from './ui.ts';
 import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
+let waitingForContinue = false;
 
 function onRunComplete(state: TypingState): void {
   const wpm = calculateWPM(state);
@@ -15,7 +16,7 @@ function onRunComplete(state: TypingState): void {
   const wordCount = state.words.length;
   const duration = (state.endTime ?? Date.now()) - (state.startTime ?? Date.now());
 
-  // Show final stats
+  // Show final stats above typing area
   renderStats(wpm, accuracy);
 
   // Save run to garden
@@ -30,10 +31,19 @@ function onRunComplete(state: TypingState): void {
   });
   saveGarden(garden);
 
-  // Start new run after a brief pause
-  setTimeout(() => {
-    startNewRun();
-  }, 2000);
+  // Show continue prompt and wait for space
+  renderContinuePrompt();
+  waitingForContinue = true;
+}
+
+function handleContinue(e: KeyboardEvent): void {
+  if (!waitingForContinue) return;
+  if (e.key !== ' ') return;
+
+  e.preventDefault();
+  waitingForContinue = false;
+  clearStats();
+  startNewRun();
 }
 
 function startNewRun(): void {
@@ -52,4 +62,5 @@ function startNewRun(): void {
 // Initial render and start
 render(garden);
 initCursorIdleDetection();
+document.addEventListener('keydown', handleContinue);
 startNewRun();

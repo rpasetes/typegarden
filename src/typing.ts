@@ -93,7 +93,10 @@ function handleKeydown(e: KeyboardEvent): void {
   if (key.length === 1) {
     e.preventDefault();
     handleCharacter(key);
-    renderWords(currentState);
+    // Only render if run is still active (not completed)
+    if (currentState && !currentState.endTime) {
+      renderWords(currentState);
+    }
     return;
   }
 }
