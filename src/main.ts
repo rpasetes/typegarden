@@ -3,7 +3,7 @@ import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
 import type { TypingState } from './typing.ts';
 import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll } from './ui.ts';
+import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay } from './ui.ts';
 import { generateWords } from './words.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
@@ -42,6 +42,9 @@ function onRunComplete(state: TypingState): void {
 }
 
 function handleContinue(e: KeyboardEvent): void {
+  // Hide overlay on any keypress
+  hideFocusOverlay();
+
   if (!waitingForContinue) return;
   if (e.key !== ' ') return;
 
@@ -68,4 +71,9 @@ function startNewRun(): void {
 render(garden);
 initCursorIdleDetection();
 document.addEventListener('keydown', handleContinue);
+
+// Focus overlay - show only on blur, not on load
+window.addEventListener('blur', showFocusOverlay);
+window.addEventListener('focus', hideFocusOverlay);
+
 startNewRun();

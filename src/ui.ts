@@ -246,6 +246,29 @@ export function hideProgress(): void {
   progressEl.classList.remove('visible');
 }
 
+export function showFocusOverlay(): void {
+  // Don't show if already visible
+  if (document.querySelector('.focus-overlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'focus-overlay';
+  overlay.innerHTML = '<p class="focus-overlay-message">click here or press a key to focus</p>';
+
+  // Remove on click
+  overlay.addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
+}
+
+export function hideFocusOverlay(): void {
+  const overlay = document.querySelector('.focus-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
+}
+
 export function renderUpgradeChoice(
   options: { id: string; name: string; description: string }[],
   onSelect: (id: string) => void

@@ -180,6 +180,24 @@ body {
   transition: color 0.2s ease;
 }
 
+/* Focus overlay - shown only on blur */
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 40, 40, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  cursor: pointer;
+  animation: fadeIn 0.2s ease;
+}
+
+.focus-overlay-message {
+  color: var(--text-dim);
+  font-size: 1rem;
+}
+
 /* Minimal mode (cosmetic.minimal upgrade) */
 .minimal .stats {
   display: none;
