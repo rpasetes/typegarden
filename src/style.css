@@ -140,7 +140,8 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translateY(-100%) translateY(-1rem);
+  /* Match the line spacing of the words (line-height: 2 = 1em padding above/below) */
+  transform: translateY(-100%);
 }
 
 /* Progress indicator */
