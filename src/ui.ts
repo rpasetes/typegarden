@@ -240,10 +240,18 @@ export function fadeOutWords(): Promise<void> {
     // Add fade-out class
     wordsEl.classList.add('fade-out');
 
-    // Resolve after transition completes (300ms)
-    setTimeout(() => {
+    // Wait for CSS transition to complete
+    const onTransitionEnd = () => {
+      wordsEl.removeEventListener('transitionend', onTransitionEnd);
       resolve();
-    }, 300);
+    };
+    wordsEl.addEventListener('transitionend', onTransitionEnd);
+
+    // Fallback timeout in case transitionend doesn't fire
+    setTimeout(() => {
+      wordsEl.removeEventListener('transitionend', onTransitionEnd);
+      resolve();
+    }, 400);
   });
 }
 
@@ -255,17 +263,27 @@ export function fadeOutStats(): Promise<void> {
     // Fade out stats
     if (statsEl) {
       statsEl.classList.remove('visible');
+
+      // Wait for stats CSS transition to complete
+      const onTransitionEnd = () => {
+        statsEl.removeEventListener('transitionend', onTransitionEnd);
+        resolve();
+      };
+      statsEl.addEventListener('transitionend', onTransitionEnd);
+
+      // Fallback timeout
+      setTimeout(() => {
+        statsEl.removeEventListener('transitionend', onTransitionEnd);
+        resolve();
+      }, 500);
+    } else {
+      resolve();
     }
 
     // Fade out continue prompt
     if (wordsEl) {
       wordsEl.classList.add('fade-out');
     }
-
-    // Resolve after transition completes (400ms from stats CSS)
-    setTimeout(() => {
-      resolve();
-    }, 400);
   });
 }
 
@@ -344,9 +362,19 @@ export function hideFocusOverlay(): void {
 
   // Fade out before removing
   overlay.classList.add('fade-out');
-  setTimeout(() => {
+
+  // Wait for CSS transition to complete
+  const onTransitionEnd = () => {
+    overlay.removeEventListener('transitionend', onTransitionEnd);
     overlay.remove();
-  }, 200); // Match transition duration
+  };
+  overlay.addEventListener('transitionend', onTransitionEnd);
+
+  // Fallback timeout in case transitionend doesn't fire
+  setTimeout(() => {
+    overlay.removeEventListener('transitionend', onTransitionEnd);
+    overlay.remove();
+  }, 300);
 }
 
 export function renderUpgradeChoice(

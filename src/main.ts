@@ -84,9 +84,11 @@ function startNewRun(): void {
   // Start typing session (this calls renderWords)
   startTyping(words, onRunComplete);
 
-  // Fade in words after initial render
+  // Double RAF to ensure browser applies initial fade-out class before removing it
   requestAnimationFrame(() => {
-    fadeInWords();
+    requestAnimationFrame(() => {
+      fadeInWords();
+    });
   });
 }
 
