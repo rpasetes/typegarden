@@ -223,6 +223,8 @@ export function renderContinuePrompt(): void {
   // Hide cursor
   if (cursor) cursor.style.opacity = '0';
 
+  // Remove fade-out class and show continue prompt
+  wordsEl.classList.remove('fade-out');
   wordsEl.innerHTML = '<span class="continue-prompt">press space to keep typing</span>';
   wordsEl.style.transform = 'translateY(0)';
 }
@@ -238,10 +240,10 @@ export function fadeOutWords(): Promise<void> {
     // Add fade-out class
     wordsEl.classList.add('fade-out');
 
-    // Resolve after transition completes (500ms) + small delay
+    // Resolve after transition completes (300ms)
     setTimeout(() => {
       resolve();
-    }, 600);
+    }, 300);
   });
 }
 
