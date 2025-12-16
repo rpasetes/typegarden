@@ -84,13 +84,11 @@ body {
 }
 
 .word.word-new {
-  animation: word-fade-in 0.4s ease-out forwards;
+  opacity: 0;
+  animation: word-fade-in 0.3s ease-out forwards;
 }
 
 @keyframes word-fade-in {
-  from {
-    opacity: 0;
-  }
   to {
     opacity: 1;
   }

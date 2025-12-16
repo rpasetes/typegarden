@@ -123,8 +123,10 @@ export function renderWords(state: TypingState): void {
 
     const isMistaken = state.mistaken[wordIndex] ?? false;
     const isNewWord = newWordsStartIndex > 0 && wordIndex >= newWordsStartIndex;
+    const newWordOffset = isNewWord ? wordIndex - newWordsStartIndex : 0;
     const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}${isNewWord ? ' word-new' : ''}`;
-    return `<span class="${wordClass}">${chars.join('')}</span>`;
+    const styleAttr = isNewWord ? ` style="animation-delay: ${newWordOffset * 30}ms"` : '';
+    return `<span class="${wordClass}"${styleAttr}>${chars.join('')}</span>`;
   });
 
   wordsEl.innerHTML = wordElements.join(' ');
