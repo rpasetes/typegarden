@@ -342,14 +342,29 @@ body {
 /* Golden Particles */
 .golden-particle {
   position: fixed;
-  width: 6px;
-  height: 6px;
   background: var(--accent);
   border-radius: 50%;
   pointer-events: none;
   z-index: 1000;
-  box-shadow: 0 0 8px var(--accent), 0 0 12px var(--accent);
   animation: particle-flight 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.golden-particle--small {
+  width: 4px;
+  height: 4px;
+  box-shadow: 0 0 4px var(--accent);
+}
+
+.golden-particle--medium {
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 8px var(--accent), 0 0 12px var(--accent);
+}
+
+.golden-particle--large {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 12px var(--accent), 0 0 20px var(--accent), 0 0 30px var(--accent);
 }
 
 @keyframes particle-flight {

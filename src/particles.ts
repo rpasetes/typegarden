@@ -28,9 +28,16 @@ function getTargetPosition(): { x: number; y: number } {
   };
 }
 
+// Particle settings per reward tier
+const PARTICLE_CONFIG = {
+  1: { count: 5, burstDistance: 25, size: 'small' },
+  2: { count: 8, burstDistance: 35, size: 'medium' },
+  3: { count: 12, burstDistance: 50, size: 'large' },
+} as const;
+
 // Create and animate particle burst
-export function spawnGoldenParticles(x: number, y: number): void {
-  const particleCount = 8;
+export function spawnGoldenParticles(x: number, y: number, reward: 1 | 2 | 3 = 1): void {
+  const config = PARTICLE_CONFIG[reward];
   const particles: Particle[] = [];
   const target = getTargetPosition();
 
@@ -39,18 +46,18 @@ export function spawnGoldenParticles(x: number, y: number): void {
   if (!container) return;
 
   // Create particles
-  for (let i = 0; i < particleCount; i++) {
+  for (let i = 0; i < config.count; i++) {
     const particle = document.createElement('div');
-    particle.className = 'golden-particle';
+    particle.className = `golden-particle golden-particle--${config.size}`;
 
     // Random spread for initial burst
-    const angle = (Math.PI * 2 * i) / particleCount;
-    const burstDistance = 30 + Math.random() * 20;
+    const angle = (Math.PI * 2 * i) / config.count;
+    const burstDistance = config.burstDistance + Math.random() * 15;
     const burstX = Math.cos(angle) * burstDistance;
     const burstY = Math.sin(angle) * burstDistance;
 
     // Stagger animation slightly
-    const delay = i * 20;
+    const delay = i * 15;
 
     // Set initial position
     particle.style.left = `${x}px`;
@@ -74,10 +81,10 @@ export function spawnGoldenParticles(x: number, y: number): void {
   }
 
   // Clean up particles after animation completes
-  // Animation is 0.8s + max delay of 140ms
+  const maxDelay = config.count * 15;
   setTimeout(() => {
     particles.forEach((p) => p.element.remove());
-  }, 1000);
+  }, 1000 + maxDelay);
 }
 
 // Get screen position of a character element
