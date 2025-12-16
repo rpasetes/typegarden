@@ -2,6 +2,7 @@ import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
+import { getActiveGolden } from './golden.ts';
 
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
@@ -138,6 +139,7 @@ export function renderWords(state: TypingState): void {
 
     // Update character states
     const charEls = wordEl.querySelectorAll('.char:not(.extra)');
+    const activeGolden = getActiveGolden();
     for (let charIndex = 0; charIndex < word.length; charIndex++) {
       const charEl = charEls[charIndex] as HTMLElement | undefined;
       if (!charEl) continue;
@@ -145,10 +147,14 @@ export function renderWords(state: TypingState): void {
       const typedChar = typed[charIndex];
       const isCorrect = typedChar === word[charIndex];
       const isTyped = typedChar !== undefined;
+      const isGolden = activeGolden &&
+        activeGolden.wordIndex === wordIndex &&
+        activeGolden.charIndex === charIndex &&
+        !isTyped;
 
       // Update typing state classes (preserve char-new if present)
       const hasCharNew = charEl.classList.contains('char-new');
-      charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+      charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${isGolden ? ' golden' : ''}`;
 
       // Update cursor target
       charEl.removeAttribute('data-cursor-target');
