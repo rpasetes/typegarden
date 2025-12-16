@@ -4,7 +4,8 @@ import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
 import { render, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, prepareWordsFadeIn, renderSolBar } from './ui.ts';
 import { generateWords } from './words.ts';
-import { initSol, earnBaseSol, setOnSolChange, getSolState } from './sol.ts';
+import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
+import { setOnGoldenCapture, resetGolden } from './golden.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
@@ -21,6 +22,11 @@ setOnSolChange((solState) => {
   saveGarden(garden);
 });
 
+// Set up golden letter capture callback
+setOnGoldenCapture((reward) => {
+  earnGoldenSol(reward as 1 | 2 | 3);
+});
+
 function onWordComplete(): void {
   earnBaseSol();
 }
@@ -29,6 +35,7 @@ function startTypingSession(): void {
   // Render fresh UI
   render(garden);
   resetScroll();
+  resetGolden();
 
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();
