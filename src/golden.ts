@@ -46,18 +46,15 @@ function getRewardForDistance(distance: number): 1 | 2 | 3 {
   return 3;                          // Hard: 11-15 chars
 }
 
-// Calculate dynamic fade duration based on typing speed and distance
-function calculateFadeDuration(distance: number): number {
+// Calculate dynamic fade duration based on typing speed only
+function calculateFadeDuration(): number {
   const baseDuration = 4000;
   const typingSpeed = getTypingSpeed();
 
-  // Speed modifier: 5 cps = 1x, 10 cps = 2x faster
+  // Speed modifier: 5 cps = 1x, 10 cps = 2x faster fade
   const speedModifier = Math.max(0.5, Math.min(2, typingSpeed / 5));
 
-  // Distance modifier: further = faster fade
-  const distanceModifier = Math.max(0.5, Math.min(1.5, distance / 10));
-
-  return baseDuration / (speedModifier * distanceModifier);
+  return baseDuration / speedModifier;
 }
 
 export function getFadeDuration(): number {
@@ -121,7 +118,7 @@ function spawnGolden(
     charIndex: target.charIndex,
     spawnedAt: Date.now(),
     reward: getRewardForDistance(distance),
-    fadeDuration: calculateFadeDuration(distance),
+    fadeDuration: calculateFadeDuration(),
   };
 }
 
