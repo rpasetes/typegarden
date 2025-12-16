@@ -18,6 +18,7 @@ export interface GardenState {
   activeUpgrades: string[]; // Currently enabled
   runHistory: RunResult[];
   totalWordsTyped: number;
+  lifetimeSol: number; // Total sol earned across all sessions
 }
 
 const STORAGE_KEY = 'typegarden';
@@ -31,6 +32,7 @@ export function initGarden(): GardenState {
     activeUpgrades: [],
     runHistory: [],
     totalWordsTyped: 0,
+    lifetimeSol: 0,
   };
 }
 
