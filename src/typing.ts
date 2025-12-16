@@ -225,7 +225,7 @@ function handleSpace(): void {
   // Check if we need more words (endless mode)
   const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
   if (wordsRemaining < 10) {
-    const newWords = generateWords({ type: 'common', count: 20 });
+    const newWords = generateWords({ type: 'common', count: 15 });
     appendWords(newWords);
   }
 }
