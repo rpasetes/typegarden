@@ -2,10 +2,11 @@ import './style.css';
 import { startTyping } from './typing.ts';
 import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, prepareWordsFadeIn, renderSolBar } from './ui.ts';
+import { render, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, prepareWordsFadeIn, renderSolBar, renderWords } from './ui.ts';
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
-import { setOnGoldenCapture, resetGolden } from './golden.ts';
+import { setOnGoldenCapture, resetGolden, checkExpiry, getActiveGolden } from './golden.ts';
+import { getTypingState } from './typing.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
@@ -79,3 +80,14 @@ window.addEventListener('blur', showFocusOverlay);
 window.addEventListener('focus', hideFocusOverlay);
 
 startTypingSession();
+
+// Periodic golden letter expiry check
+setInterval(() => {
+  if (getActiveGolden() && checkExpiry()) {
+    // Golden expired - re-render to remove glow
+    const state = getTypingState();
+    if (state) {
+      renderWords(state);
+    }
+  }
+}, 500);

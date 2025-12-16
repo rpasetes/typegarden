@@ -223,6 +223,9 @@ function handleSpace(): void {
   currentState.currentWordIndex++;
   currentState.currentCharIndex = 0;
 
+  // Check if golden letter was passed (skipped without capturing)
+  checkPassed(currentState.currentWordIndex, currentState.currentCharIndex, currentState.words);
+
   // Check if we need more words (endless mode)
   const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
   if (wordsRemaining < 10) {
