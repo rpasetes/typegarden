@@ -83,12 +83,12 @@ body {
   display: inline;
 }
 
-.word.word-new {
+.char.char-new {
   opacity: 0;
-  animation: word-fade-in 0.3s ease-out forwards;
+  animation: char-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-@keyframes word-fade-in {
+@keyframes char-fade-in {
   to {
     opacity: 1;
   }

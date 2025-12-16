@@ -68,15 +68,23 @@ export function renderWords(state: TypingState): void {
   // Detect newly appended words
   const newWordsStartIndex = lastRenderedWordCount;
 
+  // Track character offset within new words for staggered animation
+  let newCharOffset = 0;
+
   const wordElements = state.words.map((word, wordIndex) => {
     const typed = state.typed[wordIndex] ?? '';
     const isCurrentWord = wordIndex === state.currentWordIndex;
     const isPastWord = wordIndex < state.currentWordIndex;
+    const isNewWord = newWordsStartIndex > 0 && wordIndex >= newWordsStartIndex;
+
+    // Track char offset at start of this word for animation
+    const wordStartCharOffset = newCharOffset;
 
     const chars = word.split('').map((char, charIndex) => {
       const typedChar = typed[charIndex];
       let className = 'char';
       let dataAttr = '';
+      let styleAttr = '';
 
       if (typedChar === undefined) {
         // Untyped: gray/dim to prompt typing
@@ -100,8 +108,20 @@ export function renderWords(state: TypingState): void {
         cursorAtEnd = true;
       }
 
-      return `<span class="${className}"${dataAttr}>${char}</span>`;
+      // Staggered fade for new word characters
+      if (isNewWord) {
+        const charOffset = wordStartCharOffset + charIndex;
+        className += ' char-new';
+        styleAttr = ` style="animation-delay: ${charOffset * 12}ms"`;
+      }
+
+      return `<span class="${className}"${dataAttr}${styleAttr}>${char}</span>`;
     });
+
+    // Update char offset for next new word (word length + space)
+    if (isNewWord) {
+      newCharOffset += word.length + 1;
+    }
 
     // Extra characters typed beyond word length
     if (typed.length > word.length) {
@@ -122,11 +142,8 @@ export function renderWords(state: TypingState): void {
     }
 
     const isMistaken = state.mistaken[wordIndex] ?? false;
-    const isNewWord = newWordsStartIndex > 0 && wordIndex >= newWordsStartIndex;
-    const newWordOffset = isNewWord ? wordIndex - newWordsStartIndex : 0;
-    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}${isNewWord ? ' word-new' : ''}`;
-    const styleAttr = isNewWord ? ` style="animation-delay: ${newWordOffset * 30}ms"` : '';
-    return `<span class="${wordClass}"${styleAttr}>${chars.join('')}</span>`;
+    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
+    return `<span class="${wordClass}">${chars.join('')}</span>`;
   });
 
   wordsEl.innerHTML = wordElements.join(' ');

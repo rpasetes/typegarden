@@ -34,7 +34,7 @@ function startTypingSession(): void {
   prepareWordsFadeIn();
 
   // Generate initial words
-  const words = generateWords({ type: 'common', count: 50 });
+  const words = generateWords({ type: 'common', count: 40 });
 
   // Mark run as active
   isRunActive = true;
