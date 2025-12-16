@@ -1,5 +1,6 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
+import { generateWords } from './words.ts';
 
 export interface TypingState {
   words: string[];
@@ -17,9 +18,11 @@ export interface TypingState {
 }
 
 export type TypingCompleteCallback = (state: TypingState) => void;
+export type WordCompleteCallback = () => void;
 
 let currentState: TypingState | null = null;
 let onCompleteCallback: TypingCompleteCallback | null = null;
+let onWordCompleteCallback: WordCompleteCallback | null = null;
 
 // Max gap between keystrokes before considered AFK (5 seconds)
 const AFK_THRESHOLD_MS = 5000;
@@ -39,6 +42,14 @@ export function createTypingState(words: string[]): TypingState {
     activeTime: 0,
     lastKeystrokeTime: null,
   };
+}
+
+export function appendWords(newWords: string[]): void {
+  if (!currentState) return;
+
+  currentState.words.push(...newWords);
+  currentState.typed.push(...newWords.map(() => ''));
+  currentState.mistaken.push(...newWords.map(() => false));
 }
 
 export function calculateWPM(state: TypingState): number {
@@ -119,10 +130,7 @@ function handleKeydown(e: KeyboardEvent): void {
   if (key.length === 1) {
     e.preventDefault();
     handleCharacter(key);
-    // Only render if run is still active (not completed)
-    if (currentState && !currentState.endTime) {
-      renderWords(currentState);
-    }
+    renderWords(currentState);
     return;
   }
 }
@@ -203,18 +211,23 @@ function handleSpace(): void {
 
   if (isIncomplete || hasErrors) {
     currentState.mistaken[wordIndex] = true;
-  }
-
-  // Check if we're at the last word
-  if (wordIndex >= currentState.words.length - 1) {
-    // Complete the run
-    completeRun();
-    return;
+  } else {
+    // Word completed correctly - trigger callback
+    if (onWordCompleteCallback) {
+      onWordCompleteCallback();
+    }
   }
 
   // Advance to next word
   currentState.currentWordIndex++;
   currentState.currentCharIndex = 0;
+
+  // Check if we need more words (endless mode)
+  const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
+  if (wordsRemaining < 10) {
+    const newWords = generateWords({ type: 'common', count: 20 });
+    appendWords(newWords);
+  }
 }
 
 function handleCharacter(char: string): void {
@@ -239,38 +252,19 @@ function handleCharacter(char: string): void {
     currentState.errors++;
   }
 
-  // Auto-complete: if last word and typed length matches word length
-  const isLastWord = wordIndex === currentState.words.length - 1;
-  const newTypedLength = currentTyped.length + 1;
-  if (isLastWord && newTypedLength >= currentWord.length) {
-    completeRun();
-  }
-}
-
-function completeRun(): void {
-  if (!currentState) return;
-
-  currentState.endTime = Date.now();
-
-  // Remove keyboard listener
-  document.removeEventListener('keydown', handleKeydown);
-
-  // Trigger callback
-  if (onCompleteCallback) {
-    onCompleteCallback(currentState);
-  }
+  // No auto-complete in endless mode - user must press space to advance
 }
 
 export function startTyping(
   words: string[],
-  onComplete?: TypingCompleteCallback
+  onWordComplete?: WordCompleteCallback
 ): TypingState {
   // Clean up previous listener if any
   document.removeEventListener('keydown', handleKeydown);
 
   // Create fresh state
   currentState = createTypingState(words);
-  onCompleteCallback = onComplete ?? null;
+  onWordCompleteCallback = onWordComplete ?? null;
 
   // Render initial state
   renderWords(currentState);
