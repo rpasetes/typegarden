@@ -21,9 +21,9 @@ const EXPIRY_MS = 5000;           // Fade after 5 seconds
 let charsSinceSpawn = 0;
 
 // Callback for when golden is captured
-let onCaptureCallback: ((reward: number) => void) | null = null;
+let onCaptureCallback: ((reward: number, wordIndex: number, charIndex: number) => void) | null = null;
 
-export function setOnGoldenCapture(callback: (reward: number) => void): void {
+export function setOnGoldenCapture(callback: (reward: number, wordIndex: number, charIndex: number) => void): void {
   onCaptureCallback = callback;
 }
 
@@ -114,10 +114,12 @@ export function captureGolden(): void {
   if (!activeGolden) return;
 
   const reward = activeGolden.reward;
+  const wordIndex = activeGolden.wordIndex;
+  const charIndex = activeGolden.charIndex;
   activeGolden = null;
 
   if (onCaptureCallback) {
-    onCaptureCallback(reward);
+    onCaptureCallback(reward, wordIndex, charIndex);
   }
 }
 
