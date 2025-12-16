@@ -63,15 +63,15 @@ export function render(garden: GardenState): void {
   `;
 }
 
-// Render only a window of words around cursor for performance
-const WORDS_BEHIND = 20;
+// Only animate words within this range of current position
+const ANIMATE_AHEAD = 30;
 
 export function renderWords(state: TypingState): void {
   const wordsEl = document.getElementById('words');
   if (!wordsEl) return;
 
-  // Calculate render window
-  const windowStart = Math.max(0, state.currentWordIndex - WORDS_BEHIND);
+  // Render all words - positions stay stable
+  const windowStart = 0;
   const windowEnd = state.words.length;
 
   // Track if cursor should be at end of a character (right edge)
@@ -89,7 +89,9 @@ export function renderWords(state: TypingState): void {
     const isPastWord = wordIndex < state.currentWordIndex;
 
     // Word is "new" if we haven't rendered this absolute index before
+    // Only animate if within range of current position (performance)
     const isNewWord = wordIndex > highestRenderedIndex;
+    const shouldAnimate = isNewWord && wordIndex < state.currentWordIndex + ANIMATE_AHEAD;
     const wordStartCharOffset = newCharOffset;
 
     const chars = word.split('').map((char, charIndex) => {
@@ -117,8 +119,8 @@ export function renderWords(state: TypingState): void {
         cursorAtEnd = true;
       }
 
-      // Staggered fade for new word characters
-      if (isNewWord) {
+      // Staggered fade for new word characters (only within animation range)
+      if (shouldAnimate) {
         const charOffset = wordStartCharOffset + charIndex;
         className += ' char-new';
         styleAttr = ` style="animation-delay: ${charOffset * 12}ms"`;
@@ -127,8 +129,8 @@ export function renderWords(state: TypingState): void {
       return `<span class="${className}"${dataAttr}${styleAttr}>${char}</span>`;
     });
 
-    // Update char offset for next new word
-    if (isNewWord) {
+    // Update char offset for next animated word
+    if (shouldAnimate) {
       newCharOffset += word.length + 1;
     }
 
@@ -217,13 +219,13 @@ function scrollToCurrentWord(): void {
   const wordTop = currentWord.offsetTop;
   const currentLine = Math.floor(wordTop / lineHeightPx);
 
-  // Only scroll when current line goes past the visible viewport
-  // Visible lines are: scrolledToLine, scrolledToLine+1, scrolledToLine+2
-  const lastVisibleLine = scrolledToLine + VISIBLE_LINES - 1;
+  // Scroll when cursor moves past the middle line
+  // This keeps upcoming text visible while maintaining context above
+  const middleLine = scrolledToLine + 1;
 
-  if (currentLine > lastVisibleLine) {
-    // Cursor went below viewport - scroll so current line is the last visible
-    scrolledToLine = currentLine - VISIBLE_LINES + 1;
+  if (currentLine > middleLine) {
+    // Cursor went past middle - scroll so current line is the middle
+    scrolledToLine = currentLine - 1;
   } else if (currentLine < scrolledToLine) {
     // Cursor went above viewport (backspace) - scroll so current line is first visible
     scrolledToLine = currentLine;
