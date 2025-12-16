@@ -152,8 +152,8 @@ export function renderWords(state: TypingState): void {
         activeGolden.charIndex === charIndex &&
         !isTyped;
 
-      // Update typing state classes (preserve char-new if present)
-      const hasCharNew = charEl.classList.contains('char-new');
+      // Update typing state classes (preserve char-new if present, but not for golden letters)
+      const hasCharNew = charEl.classList.contains('char-new') && !isGolden;
       charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${isGolden ? ' golden' : ''}`;
 
       // Update cursor target
