@@ -200,6 +200,9 @@ export function resetScroll(): void {
   scrolledToLine = 0;
 }
 
+// Number of visible lines in viewport
+const VISIBLE_LINES = 3;
+
 function scrollToCurrentWord(): void {
   const wordsEl = document.getElementById('words');
   const currentWord = document.querySelector('.word.current') as HTMLElement | null;
@@ -214,11 +217,16 @@ function scrollToCurrentWord(): void {
   const wordTop = currentWord.offsetTop;
   const currentLine = Math.floor(wordTop / lineHeightPx);
 
-  // Keep current word always on line 2 (center)
-  // scrolledToLine + 1 = center line, so scrolledToLine = currentLine - 1
-  const targetScroll = Math.max(0, currentLine - 1);
-  if (targetScroll !== scrolledToLine) {
-    scrolledToLine = targetScroll;
+  // Only scroll when current line goes past the visible viewport
+  // Visible lines are: scrolledToLine, scrolledToLine+1, scrolledToLine+2
+  const lastVisibleLine = scrolledToLine + VISIBLE_LINES - 1;
+
+  if (currentLine > lastVisibleLine) {
+    // Cursor went below viewport - scroll so current line is the last visible
+    scrolledToLine = currentLine - VISIBLE_LINES + 1;
+  } else if (currentLine < scrolledToLine) {
+    // Cursor went above viewport (backspace) - scroll so current line is first visible
+    scrolledToLine = currentLine;
   }
 
   const offset = -scrolledToLine * lineHeightPx;
