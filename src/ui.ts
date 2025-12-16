@@ -6,9 +6,16 @@ import { getIsRunActive } from './main.ts';
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
 
+// Track when each word's animation completes (wordIndex -> completion timestamp)
+const animatingUntil = new Map<number, number>();
+
+// Animation duration in ms (matches CSS: 0.4s animation + max stagger delay)
+const ANIMATION_DURATION_MS = 600;
+
 // Reset when starting new session
 export function resetRenderedTracking(): void {
   highestRenderedIndex = -1;
+  animatingUntil.clear();
 }
 
 export function setCursorActive(): void {
@@ -70,99 +77,134 @@ export function renderWords(state: TypingState): void {
   const wordsEl = document.getElementById('words');
   if (!wordsEl) return;
 
-  // Render all words - positions stay stable
-  const windowStart = 0;
-  const windowEnd = state.words.length;
-
-  // On initial render, animate all words; otherwise limit to nearby words
+  const now = Date.now();
   const isInitialRender = highestRenderedIndex === -1;
-
-  // Track if cursor should be at end of a character (right edge)
   let cursorAtEnd = false;
 
-  // Track character offset for staggered fade animation (only for new words)
+  // Get existing word elements
+  const existingWords = wordsEl.querySelectorAll('.word');
+
+  // Track char offset for new word animations
   let newCharOffset = 0;
 
-  const wordElements: string[] = [];
-
-  for (let wordIndex = windowStart; wordIndex < windowEnd; wordIndex++) {
+  for (let wordIndex = 0; wordIndex < state.words.length; wordIndex++) {
     const word = state.words[wordIndex] ?? '';
     const typed = state.typed[wordIndex] ?? '';
     const isCurrentWord = wordIndex === state.currentWordIndex;
     const isPastWord = wordIndex < state.currentWordIndex;
-
-    // Word is "new" if we haven't rendered this absolute index before
-    // Animate all on initial render; otherwise limit to nearby words (performance)
+    const isMistaken = state.mistaken[wordIndex] ?? false;
     const isNewWord = wordIndex > highestRenderedIndex;
-    const shouldAnimate = isNewWord && (isInitialRender || wordIndex < state.currentWordIndex + ANIMATE_AHEAD);
-    const wordStartCharOffset = newCharOffset;
 
-    const chars = word.split('').map((char, charIndex) => {
-      const typedChar = typed[charIndex];
-      let className = 'char';
-      let dataAttr = '';
-      let styleAttr = '';
-
-      if (typedChar === undefined) {
-        className += ' untyped';
-      } else if (typedChar === char) {
-        className += ' correct';
-      } else {
-        className += ' incorrect';
-      }
-
-      // Mark cursor target
-      if (isCurrentWord && charIndex === state.currentCharIndex) {
-        dataAttr = ' data-cursor-target="true"';
-      }
-
-      // Mark cursor at end of last typed char
-      if (isCurrentWord && charIndex === state.currentCharIndex - 1 && state.currentCharIndex === typed.length && typed.length <= word.length) {
-        dataAttr = ' data-cursor-target="true" data-cursor-end="true"';
-        cursorAtEnd = true;
-      }
-
-      // Staggered fade for new word characters (only within animation range)
-      if (shouldAnimate) {
-        const charOffset = wordStartCharOffset + charIndex;
-        className += ' char-new';
-        styleAttr = ` style="animation-delay: ${charOffset * 12}ms"`;
-      }
-
-      return `<span class="${className}"${dataAttr}${styleAttr}>${char}</span>`;
-    });
-
-    // Update char offset for next animated word
-    if (shouldAnimate) {
-      newCharOffset += word.length + 1;
+    // Schedule animation for new words
+    if (isNewWord && (isInitialRender || wordIndex < state.currentWordIndex + ANIMATE_AHEAD)) {
+      const animationEndTime = now + ANIMATION_DURATION_MS + (newCharOffset + word.length) * 12;
+      animatingUntil.set(wordIndex, animationEndTime);
     }
 
-    // Extra characters typed beyond word length
-    if (typed.length > word.length) {
-      const extra = typed.slice(word.length);
-      for (let i = 0; i < extra.length; i++) {
-        const extraIndex = word.length + i;
-        const isLastTyped = extraIndex === typed.length - 1;
-        let dataAttr = '';
+    const isAnimating = animatingUntil.has(wordIndex) && now < (animatingUntil.get(wordIndex) ?? 0);
 
-        if (isCurrentWord && isLastTyped && state.currentCharIndex === typed.length) {
-          dataAttr = ' data-cursor-target="true" data-cursor-end="true"';
-          cursorAtEnd = true;
+    // Check if word element already exists
+    let wordEl = existingWords[wordIndex] as HTMLElement | undefined;
+
+    if (!wordEl) {
+      // Create new word element
+      wordEl = document.createElement('span');
+      wordEl.className = 'word';
+
+      // Create character spans
+      for (let charIndex = 0; charIndex < word.length; charIndex++) {
+        const charEl = document.createElement('span');
+        charEl.className = 'char untyped';
+        charEl.textContent = word[charIndex] ?? '';
+
+        if (isAnimating) {
+          const charOffset = newCharOffset + charIndex;
+          charEl.classList.add('char-new');
+          charEl.style.animationDelay = `${charOffset * 12}ms`;
         }
 
-        chars.push(`<span class="char extra incorrect"${dataAttr}>${extra[i]}</span>`);
+        wordEl.appendChild(charEl);
+      }
+
+      // Add space text node between words (except for first word)
+      if (wordIndex > 0) {
+        wordsEl.appendChild(document.createTextNode(' '));
+      }
+      wordsEl.appendChild(wordEl);
+    }
+
+    // Update word classes
+    wordEl.className = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
+
+    // Update character states
+    const charEls = wordEl.querySelectorAll('.char:not(.extra)');
+    for (let charIndex = 0; charIndex < word.length; charIndex++) {
+      const charEl = charEls[charIndex] as HTMLElement | undefined;
+      if (!charEl) continue;
+
+      const typedChar = typed[charIndex];
+      const isCorrect = typedChar === word[charIndex];
+      const isTyped = typedChar !== undefined;
+
+      // Update typing state classes (preserve char-new if present)
+      const hasCharNew = charEl.classList.contains('char-new');
+      charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+
+      // Update cursor target
+      charEl.removeAttribute('data-cursor-target');
+      charEl.removeAttribute('data-cursor-end');
+
+      if (isCurrentWord && charIndex === state.currentCharIndex) {
+        charEl.setAttribute('data-cursor-target', 'true');
+      }
+
+      if (isCurrentWord && charIndex === state.currentCharIndex - 1 &&
+          state.currentCharIndex === typed.length && typed.length <= word.length) {
+        charEl.setAttribute('data-cursor-target', 'true');
+        charEl.setAttribute('data-cursor-end', 'true');
+        cursorAtEnd = true;
       }
     }
 
-    const isMistaken = state.mistaken[wordIndex] ?? false;
-    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
-    wordElements.push(`<span class="${wordClass}">${chars.join('')}</span>`);
+    // Handle extra characters (typed beyond word length)
+    const existingExtras = wordEl.querySelectorAll('.char.extra');
+    const extraCount = Math.max(0, typed.length - word.length);
+
+    // Remove excess extras
+    for (let i = existingExtras.length - 1; i >= extraCount; i--) {
+      existingExtras[i]?.remove();
+    }
+
+    // Add/update extras
+    for (let i = 0; i < extraCount; i++) {
+      let extraEl = existingExtras[i] as HTMLElement | undefined;
+      const extraChar = typed[word.length + i] ?? '';
+
+      if (!extraEl) {
+        extraEl = document.createElement('span');
+        extraEl.className = 'char extra incorrect';
+        wordEl.appendChild(extraEl);
+      }
+
+      extraEl.textContent = extraChar;
+      extraEl.removeAttribute('data-cursor-target');
+      extraEl.removeAttribute('data-cursor-end');
+
+      const isLastExtra = i === extraCount - 1;
+      if (isCurrentWord && isLastExtra && state.currentCharIndex === typed.length) {
+        extraEl.setAttribute('data-cursor-target', 'true');
+        extraEl.setAttribute('data-cursor-end', 'true');
+        cursorAtEnd = true;
+      }
+    }
+
+    if (isAnimating) {
+      newCharOffset += word.length + 1;
+    }
   }
 
-  wordsEl.innerHTML = wordElements.join(' ');
-
   // Update highest rendered index
-  highestRenderedIndex = Math.max(highestRenderedIndex, windowEnd - 1);
+  highestRenderedIndex = Math.max(highestRenderedIndex, state.words.length - 1);
 
   // Scroll and position cursor
   scrollToCurrentWord();
