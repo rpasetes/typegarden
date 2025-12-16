@@ -198,7 +198,7 @@ export function renderWords(state: TypingState): void {
       }
     }
 
-    if (isAnimating) {
+    if (isNewWord) {
       newCharOffset += word.length + 1;
     }
   }
