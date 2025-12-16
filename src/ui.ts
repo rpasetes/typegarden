@@ -3,6 +3,9 @@ import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
 
+// Track rendered word count to detect newly appended words
+let lastRenderedWordCount = 0;
+
 export function setCursorActive(): void {
   const cursor = document.getElementById('cursor');
   if (!cursor) return;
@@ -36,6 +39,9 @@ export function render(garden: GardenState): void {
   const app = document.getElementById('app');
   if (!app) return;
 
+  // Reset word count tracking for new session
+  lastRenderedWordCount = 0;
+
   // Apply any active upgrade effects
   applyUpgradeEffects(garden.activeUpgrades);
 
@@ -58,6 +64,9 @@ export function renderWords(state: TypingState): void {
 
   // Track if cursor should be at end of a character (right edge)
   let cursorAtEnd = false;
+
+  // Detect newly appended words
+  const newWordsStartIndex = lastRenderedWordCount;
 
   const wordElements = state.words.map((word, wordIndex) => {
     const typed = state.typed[wordIndex] ?? '';
@@ -113,11 +122,15 @@ export function renderWords(state: TypingState): void {
     }
 
     const isMistaken = state.mistaken[wordIndex] ?? false;
-    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
+    const isNewWord = newWordsStartIndex > 0 && wordIndex >= newWordsStartIndex;
+    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}${isNewWord ? ' word-new' : ''}`;
     return `<span class="${wordClass}">${chars.join('')}</span>`;
   });
 
   wordsEl.innerHTML = wordElements.join(' ');
+
+  // Update tracked word count
+  lastRenderedWordCount = state.words.length;
 
   // Scroll first, then position cursor (so cursor reflects post-scroll position)
   scrollToCurrentWord();
