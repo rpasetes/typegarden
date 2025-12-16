@@ -74,6 +74,9 @@ export function renderWords(state: TypingState): void {
   const windowStart = 0;
   const windowEnd = state.words.length;
 
+  // On initial render, animate all words; otherwise limit to nearby words
+  const isInitialRender = highestRenderedIndex === -1;
+
   // Track if cursor should be at end of a character (right edge)
   let cursorAtEnd = false;
 
@@ -89,9 +92,9 @@ export function renderWords(state: TypingState): void {
     const isPastWord = wordIndex < state.currentWordIndex;
 
     // Word is "new" if we haven't rendered this absolute index before
-    // Only animate if within range of current position (performance)
+    // Animate all on initial render; otherwise limit to nearby words (performance)
     const isNewWord = wordIndex > highestRenderedIndex;
-    const shouldAnimate = isNewWord && wordIndex < state.currentWordIndex + ANIMATE_AHEAD;
+    const shouldAnimate = isNewWord && (isInitialRender || wordIndex < state.currentWordIndex + ANIMATE_AHEAD);
     const wordStartCharOffset = newCharOffset;
 
     const chars = word.split('').map((char, charIndex) => {
