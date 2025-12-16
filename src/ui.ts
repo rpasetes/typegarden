@@ -2,7 +2,7 @@ import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
-import { getActiveGolden } from './golden.ts';
+import { getActiveGolden, getFadeDuration } from './golden.ts';
 
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
@@ -157,6 +157,14 @@ export function renderWords(state: TypingState): void {
       // Update typing state classes (preserve char-new if present, but not for golden letters)
       const hasCharNew = charEl.classList.contains('char-new') && !isGolden;
       charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${isGolden ? ' golden' : ''}`;
+
+      // Set fade duration CSS variable for golden letters
+      if (isGolden) {
+        const fadeDuration = getFadeDuration();
+        charEl.style.setProperty('--golden-fade-duration', `${fadeDuration}ms`);
+      } else {
+        charEl.style.removeProperty('--golden-fade-duration');
+      }
 
       // Update cursor target
       charEl.removeAttribute('data-cursor-target');
