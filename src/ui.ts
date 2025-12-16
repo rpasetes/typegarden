@@ -88,6 +88,9 @@ export function renderWords(state: TypingState): void {
   // Track char offset for new word animations
   let newCharOffset = 0;
 
+  // Get active golden letter once outside the loop
+  const activeGolden = getActiveGolden();
+
   for (let wordIndex = 0; wordIndex < state.words.length; wordIndex++) {
     const word = state.words[wordIndex] ?? '';
     const typed = state.typed[wordIndex] ?? '';
@@ -139,7 +142,6 @@ export function renderWords(state: TypingState): void {
 
     // Update character states
     const charEls = wordEl.querySelectorAll('.char:not(.extra)');
-    const activeGolden = getActiveGolden();
     for (let charIndex = 0; charIndex < word.length; charIndex++) {
       const charEl = charEls[charIndex] as HTMLElement | undefined;
       if (!charEl) continue;
