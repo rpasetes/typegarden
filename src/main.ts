@@ -6,7 +6,7 @@ import { render, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFoc
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, resetGolden } from './golden.ts';
-import { spawnGoldenParticles, getCharacterPosition } from './particles.ts';
+import { spawnGoldenParticles, getCharacterPosition, spawnRewardText } from './particles.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
@@ -30,6 +30,9 @@ setOnGoldenCapture((reward, wordIndex, charIndex) => {
   if (pos) {
     spawnGoldenParticles(pos.x, pos.y, reward as 1 | 2 | 3);
   }
+
+  // Show floating reward text
+  spawnRewardText(reward);
 
   // Earn the sol reward
   earnGoldenSol(reward as 1 | 2 | 3);

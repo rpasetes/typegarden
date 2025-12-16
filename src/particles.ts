@@ -1,6 +1,26 @@
 // Golden Capture Particle System
 // Spawns celebratory particles when golden letters are captured
 
+// Spawn floating +X reward text over the sol bar
+export function spawnRewardText(amount: number): void {
+  const solBar = document.getElementById('sol-bar');
+  if (!solBar) return;
+
+  const text = document.createElement('div');
+  text.className = 'reward-text';
+  text.textContent = `+${amount}`;
+
+  // Position above the sol bar
+  const rect = solBar.getBoundingClientRect();
+  text.style.left = `${rect.left + rect.width / 2}px`;
+  text.style.top = `${rect.top - 10}px`;
+
+  document.getElementById('app')?.appendChild(text);
+
+  // Clean up after animation
+  setTimeout(() => text.remove(), 800);
+}
+
 interface Particle {
   element: HTMLElement;
   startX: number;

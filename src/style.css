@@ -367,6 +367,30 @@ body {
   box-shadow: 0 0 12px var(--accent), 0 0 20px var(--accent), 0 0 30px var(--accent);
 }
 
+/* Floating reward text */
+.reward-text {
+  position: fixed;
+  transform: translateX(-50%);
+  color: var(--accent);
+  font-size: 1.25rem;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 1001;
+  text-shadow: 0 0 8px var(--accent);
+  animation: reward-float 0.8s ease-out forwards;
+}
+
+@keyframes reward-float {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-30px);
+  }
+}
+
 @keyframes particle-flight {
   0% {
     transform: translate(0, 0) scale(1);
