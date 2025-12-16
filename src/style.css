@@ -118,6 +118,13 @@ body {
 
 .char.golden {
   color: var(--accent);
+  animation: golden-fade var(--golden-fade-duration, 4s) ease-out forwards;
+}
+
+@keyframes golden-fade {
+  0% { opacity: 0; }
+  5% { opacity: 1; }
+  100% { opacity: 0.3; }
 }
 
 /* Cursor — height anchored to font size via em */
