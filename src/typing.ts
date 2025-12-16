@@ -1,6 +1,7 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden } from './golden.ts';
 
 export interface TypingState {
   words: string[];
@@ -247,10 +248,18 @@ function handleCharacter(char: string): void {
   const expectedChar = currentWord[currentTyped.length];
   if (char === expectedChar) {
     currentState.correctKeystrokes++;
+
+    // Check for golden letter capture (only on correct keystroke)
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      captureGolden();
+    }
   } else {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
   }
+
+  // Notify golden system of character typed (for spawn timing)
+  onCharacterTyped(wordIndex, currentState.currentCharIndex, currentState.words);
 
   // No auto-complete in endless mode - user must press space to advance
 }
