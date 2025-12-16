@@ -3,12 +3,12 @@ import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
 
-// Track rendered word count to detect newly appended words
-let lastRenderedWordCount = 0;
+// Track the highest word index we've rendered (for detecting new words)
+let highestRenderedIndex = -1;
 
-// Called by typing.ts when words are pruned to keep tracking in sync
-export function adjustWordCountForPrune(prunedCount: number): void {
-  lastRenderedWordCount = Math.max(0, lastRenderedWordCount - prunedCount);
+// Reset when starting new session
+export function resetRenderedTracking(): void {
+  highestRenderedIndex = -1;
 }
 
 export function setCursorActive(): void {
@@ -44,8 +44,8 @@ export function render(garden: GardenState): void {
   const app = document.getElementById('app');
   if (!app) return;
 
-  // Reset word count tracking for new session
-  lastRenderedWordCount = 0;
+  // Reset tracking for new session
+  resetRenderedTracking();
 
   // Apply any active upgrade effects
   applyUpgradeEffects(garden.activeUpgrades);
@@ -63,26 +63,33 @@ export function render(garden: GardenState): void {
   `;
 }
 
+// Render only a window of words around cursor for performance
+const WORDS_BEHIND = 20;
+
 export function renderWords(state: TypingState): void {
   const wordsEl = document.getElementById('words');
   if (!wordsEl) return;
 
+  // Calculate render window
+  const windowStart = Math.max(0, state.currentWordIndex - WORDS_BEHIND);
+  const windowEnd = state.words.length;
+
   // Track if cursor should be at end of a character (right edge)
   let cursorAtEnd = false;
 
-  // Detect newly appended words
-  const newWordsStartIndex = lastRenderedWordCount;
-
-  // Track character offset within new words for staggered animation
+  // Track character offset for staggered fade animation (only for new words)
   let newCharOffset = 0;
 
-  const wordElements = state.words.map((word, wordIndex) => {
+  const wordElements: string[] = [];
+
+  for (let wordIndex = windowStart; wordIndex < windowEnd; wordIndex++) {
+    const word = state.words[wordIndex] ?? '';
     const typed = state.typed[wordIndex] ?? '';
     const isCurrentWord = wordIndex === state.currentWordIndex;
     const isPastWord = wordIndex < state.currentWordIndex;
-    const isNewWord = newWordsStartIndex > 0 && wordIndex >= newWordsStartIndex;
 
-    // Track char offset at start of this word for animation
+    // Word is "new" if we haven't rendered this absolute index before
+    const isNewWord = wordIndex > highestRenderedIndex;
     const wordStartCharOffset = newCharOffset;
 
     const chars = word.split('').map((char, charIndex) => {
@@ -92,17 +99,14 @@ export function renderWords(state: TypingState): void {
       let styleAttr = '';
 
       if (typedChar === undefined) {
-        // Untyped: gray/dim to prompt typing
         className += ' untyped';
       } else if (typedChar === char) {
-        // Correct: white
         className += ' correct';
       } else {
-        // Incorrect: red
         className += ' incorrect';
       }
 
-      // Mark cursor target (at start of this char)
+      // Mark cursor target
       if (isCurrentWord && charIndex === state.currentCharIndex) {
         dataAttr = ' data-cursor-target="true"';
       }
@@ -123,7 +127,7 @@ export function renderWords(state: TypingState): void {
       return `<span class="${className}"${dataAttr}${styleAttr}>${char}</span>`;
     });
 
-    // Update char offset for next new word (word length + space)
+    // Update char offset for next new word
     if (isNewWord) {
       newCharOffset += word.length + 1;
     }
@@ -136,7 +140,6 @@ export function renderWords(state: TypingState): void {
         const isLastTyped = extraIndex === typed.length - 1;
         let dataAttr = '';
 
-        // Cursor at end of last extra char
         if (isCurrentWord && isLastTyped && state.currentCharIndex === typed.length) {
           dataAttr = ' data-cursor-target="true" data-cursor-end="true"';
           cursorAtEnd = true;
@@ -148,15 +151,15 @@ export function renderWords(state: TypingState): void {
 
     const isMistaken = state.mistaken[wordIndex] ?? false;
     const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
-    return `<span class="${wordClass}">${chars.join('')}</span>`;
-  });
+    wordElements.push(`<span class="${wordClass}">${chars.join('')}</span>`);
+  }
 
   wordsEl.innerHTML = wordElements.join(' ');
 
-  // Update tracked word count
-  lastRenderedWordCount = state.words.length;
+  // Update highest rendered index
+  highestRenderedIndex = Math.max(highestRenderedIndex, windowEnd - 1);
 
-  // Scroll first, then position cursor (so cursor reflects post-scroll position)
+  // Scroll and position cursor
   scrollToCurrentWord();
   updateCursorPosition(cursorAtEnd);
 }
