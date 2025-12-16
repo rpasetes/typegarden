@@ -47,6 +47,7 @@ export function render(garden: GardenState): void {
         <div id="cursor" class="cursor"></div>
       </div>
       <div id="stats" class="above-viewport stats"></div>
+      <div id="sol-bar" class="sol-bar"></div>
     </main>
   `;
 }
@@ -321,6 +322,12 @@ export function hideProgress(): void {
   const progressEl = document.getElementById('progress');
   if (!progressEl) return;
   progressEl.classList.remove('visible');
+}
+
+export function renderSolBar(sessionSol: number): void {
+  const solBarEl = document.getElementById('sol-bar');
+  if (!solBarEl) return;
+  solBarEl.innerHTML = `<span class="sol-icon">🌱</span><span class="sol-count">${sessionSol}</span>`;
 }
 
 export function showFocusOverlay(): void {
