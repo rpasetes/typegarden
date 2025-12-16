@@ -1,5 +1,5 @@
 import type { GardenState } from './garden.ts';
-import { renderWords, setCursorActive } from './ui.ts';
+import { renderWords, setCursorActive, adjustWordCountForPrune } from './ui.ts';
 import { generateWords } from './words.ts';
 
 export interface TypingState {
@@ -50,6 +50,28 @@ export function appendWords(newWords: string[]): void {
   currentState.words.push(...newWords);
   currentState.typed.push(...newWords.map(() => ''));
   currentState.mistaken.push(...newWords.map(() => false));
+}
+
+// Number of words to keep behind cursor for backspace
+const WORDS_BEHIND_BUFFER = 15;
+
+// Prune old words to prevent unbounded DOM growth
+function pruneOldWords(): void {
+  if (!currentState) return;
+
+  const pruneCount = currentState.currentWordIndex - WORDS_BEHIND_BUFFER;
+  if (pruneCount <= 0) return;
+
+  // Remove old words from all arrays
+  currentState.words.splice(0, pruneCount);
+  currentState.typed.splice(0, pruneCount);
+  currentState.mistaken.splice(0, pruneCount);
+
+  // Adjust current index
+  currentState.currentWordIndex -= pruneCount;
+
+  // Sync UI word count tracking
+  adjustWordCountForPrune(pruneCount);
 }
 
 export function calculateWPM(state: TypingState): number {
@@ -227,6 +249,9 @@ function handleSpace(): void {
   if (wordsRemaining < 10) {
     const newWords = generateWords({ type: 'common', count: 15 });
     appendWords(newWords);
+
+    // Garbage collect old words to keep DOM size bounded
+    pruneOldWords();
   }
 }
 

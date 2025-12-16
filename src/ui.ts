@@ -6,6 +6,11 @@ import { getIsRunActive } from './main.ts';
 // Track rendered word count to detect newly appended words
 let lastRenderedWordCount = 0;
 
+// Called by typing.ts when words are pruned to keep tracking in sync
+export function adjustWordCountForPrune(prunedCount: number): void {
+  lastRenderedWordCount = Math.max(0, lastRenderedWordCount - prunedCount);
+}
+
 export function setCursorActive(): void {
   const cursor = document.getElementById('cursor');
   if (!cursor) return;
