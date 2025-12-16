@@ -1,11 +1,14 @@
 // Golden Letter System
 // Spawns golden letters ahead of cursor for bonus sol
 
+import { getTypingSpeed } from './typing.ts';
+
 export interface GoldenLetter {
   wordIndex: number;
   charIndex: number;
   spawnedAt: number;       // Timestamp for expiry check
   reward: 1 | 2 | 3;       // Sol reward based on distance at spawn
+  fadeDuration: number;    // Dynamic fade duration in ms
 }
 
 // Active golden letter (one at a time)
@@ -41,6 +44,24 @@ function getRewardForDistance(distance: number): 1 | 2 | 3 {
   if (distance <= 5) return 1;      // Easy: 3-5 chars
   if (distance <= 10) return 2;     // Medium: 6-10 chars
   return 3;                          // Hard: 11-15 chars
+}
+
+// Calculate dynamic fade duration based on typing speed and distance
+function calculateFadeDuration(distance: number): number {
+  const baseDuration = 4000;
+  const typingSpeed = getTypingSpeed();
+
+  // Speed modifier: 5 cps = 1x, 10 cps = 2x faster
+  const speedModifier = Math.max(0.5, Math.min(2, typingSpeed / 5));
+
+  // Distance modifier: further = faster fade
+  const distanceModifier = Math.max(0.5, Math.min(1.5, distance / 10));
+
+  return baseDuration / (speedModifier * distanceModifier);
+}
+
+export function getFadeDuration(): number {
+  return activeGolden?.fadeDuration ?? 4000;
 }
 
 // Convert word/char position to absolute character index
@@ -100,6 +121,7 @@ function spawnGolden(
     charIndex: target.charIndex,
     spawnedAt: Date.now(),
     reward: getRewardForDistance(distance),
+    fadeDuration: calculateFadeDuration(distance),
   };
 }
 
