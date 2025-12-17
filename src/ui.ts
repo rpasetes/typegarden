@@ -3,6 +3,7 @@ import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
 import { getActiveGolden, getFadeDuration } from './golden.ts';
+import { getActiveGreen, getFadeDuration as getGreenFadeDuration } from './green.ts';
 
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
@@ -88,8 +89,9 @@ export function renderWords(state: TypingState): void {
   // Track char offset for new word animations
   let newCharOffset = 0;
 
-  // Get active golden letter once outside the loop
+  // Get active golden and green letters once outside the loop
   const activeGolden = getActiveGolden();
+  const activeGreen = getActiveGreen();
 
   for (let wordIndex = 0; wordIndex < state.words.length; wordIndex++) {
     const word = state.words[wordIndex] ?? '';
@@ -153,10 +155,15 @@ export function renderWords(state: TypingState): void {
         activeGolden.wordIndex === wordIndex &&
         activeGolden.charIndex === charIndex &&
         !isTyped;
+      const isGreen = activeGreen &&
+        activeGreen.wordIndex === wordIndex &&
+        activeGreen.charIndex === charIndex &&
+        !isTyped;
 
       // Update typing state classes
-      const hasCharNew = charEl.classList.contains('char-new') && !isGolden;
+      const hasCharNew = charEl.classList.contains('char-new') && !isGolden && !isGreen;
       const wasGolden = charEl.classList.contains('golden');
+      const wasGreen = charEl.classList.contains('green');
 
       // Preserve golden animation - skip class updates if element should stay golden
       if (wasGolden && isGolden) {
@@ -170,8 +177,19 @@ export function renderWords(state: TypingState): void {
         // No longer golden - remove golden styling
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
         charEl.style.removeProperty('--golden-fade-duration');
+      } else if (wasGreen && isGreen) {
+        // Don't touch className - preserve animation
+      } else if (isGreen && !wasGreen) {
+        // Becoming green - set class and fade duration
+        charEl.className = `char untyped green`;
+        const fadeDuration = getGreenFadeDuration();
+        charEl.style.setProperty('--green-fade-duration', `${fadeDuration}ms`);
+      } else if (wasGreen && !isGreen) {
+        // No longer green - remove green styling
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+        charEl.style.removeProperty('--green-fade-duration');
       } else {
-        // Normal update (not golden)
+        // Normal update (not golden or green)
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
       }
 

@@ -4,11 +4,13 @@ import type { GardenState } from './garden.ts';
 export interface SolState {
   sessionSol: number;
   lifetimeSol: number;
+  goldenStreak: number; // Current consecutive golden captures
 }
 
 let state: SolState = {
   sessionSol: 0,
   lifetimeSol: 0,
+  goldenStreak: 0,
 };
 
 let onSolChange: ((sol: SolState) => void) | null = null;
@@ -17,6 +19,7 @@ export function initSol(garden: GardenState): void {
   state = {
     sessionSol: garden.sessionSol ?? 0,
     lifetimeSol: garden.lifetimeSol ?? 0,
+    goldenStreak: 0, // Reset streak on session start
   };
 }
 
@@ -48,4 +51,13 @@ export function earnBaseSol(): void {
 
 export function earnGoldenSol(tier: 1 | 2 | 3): void {
   addSol(tier);
+  state.goldenStreak++;
+}
+
+export function resetGoldenStreak(): void {
+  state.goldenStreak = 0;
+}
+
+export function getGoldenStreak(): number {
+  return state.goldenStreak;
 }

@@ -6,6 +6,7 @@ import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOve
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden } from './golden.ts';
+import { setOnGreenCapture, setOnGreenExpiry, resetGreen } from './green.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText } from './particles.ts';
 
@@ -45,6 +46,24 @@ setOnGoldenExpiry(() => {
   if (state) renderWords(state);
 });
 
+// Set up green letter capture callback (for now, just log - fever mode will handle this)
+setOnGreenCapture((wordIndex, charIndex) => {
+  // Spawn particles from the captured letter's position
+  const pos = getCharacterPosition(wordIndex, charIndex);
+  if (pos) {
+    spawnGoldenParticles(pos.x, pos.y, 2); // Medium-sized particles for green
+  }
+
+  console.log('Green letter captured! Fever mode will be triggered here.');
+  // TODO: Trigger fever mode in next feature
+});
+
+// Set up green letter expiry callback to trigger re-render
+setOnGreenExpiry(() => {
+  const state = getTypingState();
+  if (state) renderWords(state);
+});
+
 function onWordComplete(): void {
   earnBaseSol();
 }
@@ -54,6 +73,7 @@ function startTypingSession(): void {
   render(garden);
   resetScroll();
   resetGolden();
+  resetGreen();
 
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();

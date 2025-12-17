@@ -8,6 +8,7 @@
   --text-error: #fb4934;
   --text-dim: #665c54;
   --accent: #fabd2f;
+  --green: #4ade80;
   --gray: #928374;
 
   /* Typography scale */
@@ -122,6 +123,16 @@ body {
 }
 
 @keyframes golden-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+.char.green {
+  color: var(--green);
+  animation: green-fade var(--green-fade-duration, 6s) ease-out forwards;
+}
+
+@keyframes green-fade {
   0% { opacity: 1; }
   100% { opacity: 0.3; }
 }

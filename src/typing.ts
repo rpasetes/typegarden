@@ -2,6 +2,7 @@ import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
 import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden } from './golden.ts';
+import { onWordCompleted, checkGreenSpawn, isGreenPosition, captureGreen, checkPassed as checkGreenPassed, resetGreen, onTypo as greenOnTypo, expireGreen } from './green.ts';
 
 export interface TypingState {
   words: string[];
@@ -233,11 +234,14 @@ function handleSpace(): void {
     currentState.mistaken[wordIndex] = true;
     // Skipping with mistakes instantly expires any active golden
     expireGolden();
+    expireGreen();
   } else if (!currentState.mistaken[wordIndex]) {
     // Word completed correctly AND was never marked as mistaken - trigger callback
     if (onWordCompleteCallback) {
       onWordCompleteCallback();
     }
+    // Track word completion for green letter spawn chance
+    onWordCompleted();
   }
 
   // Advance to next word
@@ -246,6 +250,12 @@ function handleSpace(): void {
 
   // Check if golden letter was passed (skipped without capturing)
   checkPassed(currentState.currentWordIndex, currentState.currentCharIndex, currentState.words);
+
+  // Check if green letter was passed (skipped without capturing)
+  checkGreenPassed(currentState.currentWordIndex, currentState.currentCharIndex, currentState.words);
+
+  // Check if green should spawn after word completion
+  checkGreenSpawn(currentState.currentWordIndex, currentState.currentCharIndex, currentState.words);
 
   // Check if we need more words (endless mode)
   const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
@@ -283,14 +293,25 @@ function handleCharacter(char: string): void {
     if (isGoldenPosition(wordIndex, currentTyped.length)) {
       captureGolden();
     }
+
+    // Check for green letter capture (only on correct keystroke)
+    if (isGreenPosition(wordIndex, currentTyped.length)) {
+      captureGreen();
+    }
   } else {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
     onTypo();
+    greenOnTypo();
 
     // Mistyping the golden letter itself loses the bonus entirely
     if (isGoldenPosition(wordIndex, currentTyped.length)) {
       expireGolden();
+    }
+
+    // Mistyping the green letter itself loses it entirely
+    if (isGreenPosition(wordIndex, currentTyped.length)) {
+      expireGreen();
     }
   }
 
