@@ -1,7 +1,7 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
-import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo } from './golden.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden } from './golden.ts';
 
 export interface TypingState {
   words: string[];
@@ -229,6 +229,8 @@ function handleSpace(): void {
 
   if (isIncomplete || hasErrors) {
     currentState.mistaken[wordIndex] = true;
+    // Skipping with mistakes instantly expires any active golden
+    expireGolden();
   } else {
     // Word completed correctly - trigger callback
     if (onWordCompleteCallback) {

@@ -81,6 +81,11 @@ export function onTypo(): void {
   activeGolden.fadeDuration = Math.max(500, activeGolden.fadeDuration * 0.75);
 }
 
+// Instantly expire golden when player skips a word with mistakes
+export function expireGolden(): void {
+  activeGolden = null;
+}
+
 // Convert word/char position to absolute character index
 function toAbsoluteIndex(wordIndex: number, charIndex: number, words: string[]): number {
   let abs = 0;
