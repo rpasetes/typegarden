@@ -18,9 +18,13 @@ let activeGolden: GoldenLetter | null = null;
 const SPAWN_INTERVAL = 20;        // Spawn every ~20 characters typed
 const MIN_DISTANCE = 3;           // Minimum chars ahead
 const MAX_DISTANCE = 15;          // Maximum chars ahead
+const MISTAKE_COOLDOWN_MS = 2000; // Can't spawn for 2s after a mistake
 
 // Track characters typed since last spawn
 let charsSinceSpawn = 0;
+
+// Track last mistake for cooldown
+let lastMistakeAt = 0;
 
 // Callback for when golden is captured
 let onCaptureCallback: ((reward: number) => void) | null = null;
@@ -46,6 +50,7 @@ export function resetGolden(): void {
   }
   activeGolden = null;
   charsSinceSpawn = 0;
+  lastMistakeAt = 0;
 }
 
 export function getActiveGolden(): GoldenLetter | null {
@@ -72,6 +77,35 @@ function calculateFadeDuration(): number {
 
 export function getFadeDuration(): number {
   return activeGolden?.fadeDuration ?? 4000;
+}
+
+// Speed up fade when player makes a typo
+export function onTypo(): void {
+  lastMistakeAt = Date.now();
+  if (!activeGolden) return;
+  // Cut remaining fade time by 25%
+  activeGolden.fadeDuration = Math.max(500, activeGolden.fadeDuration * 0.75);
+
+  // Reschedule timer to match new duration
+  if (expiryTimer) clearTimeout(expiryTimer);
+  const elapsed = Date.now() - activeGolden.spawnedAt;
+  const remaining = activeGolden.fadeDuration - elapsed;
+  expiryTimer = setTimeout(() => {
+    if (activeGolden) {
+      activeGolden = null;
+      expiryTimer = null;
+      if (onExpiryCallback) onExpiryCallback();
+    }
+  }, remaining + 50);
+}
+
+// Instantly expire golden when player skips a word with mistakes
+export function expireGolden(): void {
+  if (expiryTimer) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
+  activeGolden = null;
 }
 
 // Convert word/char position to absolute character index
@@ -104,8 +138,9 @@ export function onCharacterTyped(
 ): void {
   charsSinceSpawn++;
 
-  // Check for spawn
-  if (!activeGolden && charsSinceSpawn >= SPAWN_INTERVAL) {
+  // Check for spawn (skip if in cooldown from recent mistake)
+  const inCooldown = Date.now() - lastMistakeAt < MISTAKE_COOLDOWN_MS;
+  if (!activeGolden && charsSinceSpawn >= SPAWN_INTERVAL && !inCooldown) {
     spawnGolden(currentWordIndex, currentCharIndex, words);
     charsSinceSpawn = 0;
   }

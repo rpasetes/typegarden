@@ -1,7 +1,7 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
-import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden } from './golden.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden } from './golden.ts';
 
 export interface TypingState {
   words: string[];
@@ -231,6 +231,8 @@ function handleSpace(): void {
 
   if (isIncomplete || hasErrors) {
     currentState.mistaken[wordIndex] = true;
+    // Skipping with mistakes instantly expires any active golden
+    expireGolden();
   } else {
     // Word completed correctly - trigger callback
     if (onWordCompleteCallback) {
@@ -284,10 +286,16 @@ function handleCharacter(char: string): void {
   } else {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
+    onTypo();
+
+    // Mistyping the golden letter itself loses the bonus entirely
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      expireGolden();
+    }
   }
 
   // Notify golden system of character typed (for spawn timing)
-  onCharacterTyped(wordIndex, currentState.currentCharIndex, currentState.words);
+  onCharacterTyped(wordIndex, currentTyped.length, currentState.words);
 
   // No auto-complete in endless mode - user must press space to advance
 }
