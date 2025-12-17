@@ -15,7 +15,7 @@ let onSolChange: ((sol: SolState) => void) | null = null;
 
 export function initSol(garden: GardenState): void {
   state = {
-    sessionSol: 0,
+    sessionSol: garden.sessionSol ?? 0,
     lifetimeSol: garden.lifetimeSol ?? 0,
   };
 }
@@ -32,10 +32,10 @@ function addSol(amount: number): void {
   state.sessionSol += amount;
   state.lifetimeSol += amount;
 
-  // Persist lifetime sol
+  // Persist session and lifetime sol
   const garden = loadGarden();
   if (garden) {
-    saveGarden({ ...garden, lifetimeSol: state.lifetimeSol });
+    saveGarden({ ...garden, sessionSol: state.sessionSol, lifetimeSol: state.lifetimeSol });
   }
 
   // Notify listeners

@@ -19,8 +19,8 @@ initSol(garden);
 // Set up sol change listener to update UI
 setOnSolChange((solState) => {
   renderSolBar(solState.sessionSol);
-  // Update garden with lifetime sol
-  garden = { ...garden, lifetimeSol: solState.lifetimeSol };
+  // Update garden with sol state
+  garden = { ...garden, sessionSol: solState.sessionSol, lifetimeSol: solState.lifetimeSol };
   saveGarden(garden);
 });
 
