@@ -285,6 +285,11 @@ function handleCharacter(char: string): void {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
     onTypo();
+
+    // Mistyping the golden letter itself loses the bonus entirely
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      expireGolden();
+    }
   }
 
   // Notify golden system of character typed (for spawn timing)
