@@ -1,7 +1,7 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
-import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden } from './golden.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden } from './golden.ts';
 
 export interface TypingState {
   words: string[];
@@ -27,6 +27,10 @@ let onWordCompleteCallback: WordCompleteCallback | null = null;
 
 // Max gap between keystrokes before considered AFK (5 seconds)
 const AFK_THRESHOLD_MS = 5000;
+
+// Typing speed tracking (rolling window)
+const SPEED_WINDOW_SIZE = 15;
+const keystrokeTimestamps: number[] = [];
 
 export function createTypingState(words: string[]): TypingState {
   return {
@@ -66,6 +70,21 @@ export function calculateAccuracy(state: TypingState): number {
   const total = state.correctKeystrokes + state.incorrectKeystrokes;
   if (total === 0) return 100;
   return Math.round((state.correctKeystrokes / total) * 100);
+}
+
+export function getTypingSpeed(): number {
+  if (keystrokeTimestamps.length < 2) return 0;
+
+  const now = Date.now();
+  const recentStrokes = keystrokeTimestamps.filter(ts => now - ts < 5000);
+
+  if (recentStrokes.length < 2) return 0;
+
+  const timeSpan = now - recentStrokes[0]!;
+  if (timeSpan === 0) return 0;
+
+  const charsPerMs = recentStrokes.length / timeSpan;
+  return charsPerMs * 1000;
 }
 
 function trackActiveTime(): void {
@@ -212,6 +231,8 @@ function handleSpace(): void {
 
   if (isIncomplete || hasErrors) {
     currentState.mistaken[wordIndex] = true;
+    // Skipping with mistakes instantly expires any active golden
+    expireGolden();
   } else {
     // Word completed correctly - trigger callback
     if (onWordCompleteCallback) {
@@ -252,6 +273,12 @@ function handleCharacter(char: string): void {
   if (char === expectedChar) {
     currentState.correctKeystrokes++;
 
+    // Track keystroke timing for speed calculation
+    keystrokeTimestamps.push(Date.now());
+    if (keystrokeTimestamps.length > SPEED_WINDOW_SIZE) {
+      keystrokeTimestamps.shift();
+    }
+
     // Check for golden letter capture (only on correct keystroke)
     if (isGoldenPosition(wordIndex, currentTyped.length)) {
       captureGolden();
@@ -259,6 +286,12 @@ function handleCharacter(char: string): void {
   } else {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
+    onTypo();
+
+    // Mistyping the golden letter itself loses the bonus entirely
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      expireGolden();
+    }
   }
 
   // Notify golden system of character typed (for spawn timing)
