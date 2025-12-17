@@ -89,7 +89,7 @@ export function onTypo(): void {
   // Reschedule timer to match new duration
   if (expiryTimer) clearTimeout(expiryTimer);
   const elapsed = Date.now() - activeGolden.spawnedAt;
-  const remaining = activeGolden.fadeDuration - elapsed;
+  const remaining = Math.max(0, activeGolden.fadeDuration - elapsed);
   expiryTimer = setTimeout(() => {
     if (activeGolden) {
       activeGolden = null;
