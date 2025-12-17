@@ -2,10 +2,11 @@ import './style.css';
 import { startTyping } from './typing.ts';
 import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, prepareWordsFadeIn, renderSolBar } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, prepareWordsFadeIn, renderSolBar } from './ui.ts';
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
-import { setOnGoldenCapture, resetGolden } from './golden.ts';
+import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden } from './golden.ts';
+import { getTypingState } from './typing.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
@@ -25,6 +26,12 @@ setOnSolChange((solState) => {
 // Set up golden letter capture callback
 setOnGoldenCapture((reward) => {
   earnGoldenSol(reward as 1 | 2 | 3);
+});
+
+// Set up golden letter expiry callback to trigger re-render
+setOnGoldenExpiry(() => {
+  const state = getTypingState();
+  if (state) renderWords(state);
 });
 
 function onWordComplete(): void {

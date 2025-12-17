@@ -26,11 +26,25 @@ let charsSinceSpawn = 0;
 // Callback for when golden is captured
 let onCaptureCallback: ((reward: number) => void) | null = null;
 
+// Callback for when golden expires (to trigger UI update)
+let onExpiryCallback: (() => void) | null = null;
+
+// Timer for scheduled expiry
+let expiryTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function setOnGoldenCapture(callback: (reward: number) => void): void {
   onCaptureCallback = callback;
 }
 
+export function setOnGoldenExpiry(callback: () => void): void {
+  onExpiryCallback = callback;
+}
+
 export function resetGolden(): void {
+  if (expiryTimer) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
   activeGolden = null;
   charsSinceSpawn = 0;
 }
@@ -120,6 +134,16 @@ function spawnGolden(
     reward: getRewardForDistance(distance),
     fadeDuration: calculateFadeDuration(),
   };
+
+  // Schedule expiry check to update UI when golden times out
+  if (expiryTimer) clearTimeout(expiryTimer);
+  expiryTimer = setTimeout(() => {
+    if (activeGolden && Date.now() - activeGolden.spawnedAt >= EXPIRY_MS) {
+      activeGolden = null;
+      expiryTimer = null;
+      if (onExpiryCallback) onExpiryCallback();
+    }
+  }, EXPIRY_MS + 50); // Small buffer to ensure animation completes
 }
 
 // Check if a position is the golden letter
@@ -131,6 +155,12 @@ export function isGoldenPosition(wordIndex: number, charIndex: number): boolean 
 // Called when player types the golden character
 export function captureGolden(): void {
   if (!activeGolden) return;
+
+  // Clear expiry timer since we're capturing
+  if (expiryTimer) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
 
   const reward = activeGolden.reward;
   activeGolden = null;

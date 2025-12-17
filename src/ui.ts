@@ -167,9 +167,14 @@ export function renderWords(state: TypingState): void {
         const fadeDuration = getFadeDuration();
         charEl.style.setProperty('--golden-fade-duration', `${fadeDuration}ms`);
       } else if (wasGolden && !isGolden) {
-        // No longer golden - remove golden styling
+        // No longer golden - remove golden styling and reset opacity
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
         charEl.style.removeProperty('--golden-fade-duration');
+        charEl.style.removeProperty('opacity');
+        // Force browser to recalculate by removing animation property
+        charEl.style.animation = 'none';
+        void charEl.offsetWidth;  // Trigger reflow
+        charEl.style.removeProperty('animation');
       } else {
         // Normal update (not golden)
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
