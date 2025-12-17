@@ -2,6 +2,7 @@
 // Spawns golden letters ahead of cursor for bonus sol
 
 import { getTypingSpeed } from './typing.ts';
+import { resetGoldenStreak } from './sol.ts';
 
 export interface GoldenLetter {
   wordIndex: number;
@@ -92,6 +93,7 @@ export function onTypo(): void {
   const remaining = Math.max(0, activeGolden.fadeDuration - elapsed);
   expiryTimer = setTimeout(() => {
     if (activeGolden) {
+      resetGoldenStreak(); // Expired golden breaks streak
       activeGolden = null;
       expiryTimer = null;
       if (onExpiryCallback) onExpiryCallback();
@@ -104,6 +106,9 @@ export function expireGolden(): void {
   if (expiryTimer) {
     clearTimeout(expiryTimer);
     expiryTimer = null;
+  }
+  if (activeGolden) {
+    resetGoldenStreak(); // Lost golden breaks streak
   }
   activeGolden = null;
 }
@@ -175,6 +180,7 @@ function spawnGolden(
   if (expiryTimer) clearTimeout(expiryTimer);
   expiryTimer = setTimeout(() => {
     if (activeGolden) {
+      resetGoldenStreak(); // Expired golden breaks streak
       activeGolden = null;
       expiryTimer = null;
       if (onExpiryCallback) onExpiryCallback();
@@ -228,6 +234,7 @@ export function checkPassed(currentWordIndex: number, currentCharIndex: number, 
   const goldenAbs = toAbsoluteIndex(activeGolden.wordIndex, activeGolden.charIndex, words);
 
   if (currentAbs > goldenAbs) {
+    resetGoldenStreak(); // Passed golden breaks streak
     activeGolden = null;
     return true; // Was passed
   }

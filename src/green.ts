@@ -15,7 +15,7 @@ export interface GreenLetter {
 let activeGreen: GreenLetter | null = null;
 
 // Spawn configuration
-const BASE_SPAWN_INTERVAL = 100;  // Base: spawn every ~100 words typed
+const BASE_SPAWN_INTERVAL = 50;   // Base: spawn every ~50 words typed
 const MIN_DISTANCE = 3;            // Minimum chars ahead
 const MAX_DISTANCE = 15;           // Maximum chars ahead
 const MISTAKE_COOLDOWN_MS = 2000;  // Can't spawn for 2s after a mistake
@@ -124,10 +124,12 @@ function fromAbsoluteIndex(absIndex: number, words: string[]): { wordIndex: numb
   return null;
 }
 
-// Calculate spawn probability with golden streak bonus
-function getSpawnProbability(): number {
+// Calculate spawn threshold reduction from golden streak
+// Higher streak = spawn sooner (reduce words needed)
+function getStreakThresholdReduction(): number {
   const streakLevel = getGoldenStreak();
-  return 1.0 + (streakLevel * STREAK_BONUS_PER_LEVEL);
+  // Each streak level reduces threshold by 5% (max 50% reduction at streak 10)
+  return Math.min(0.5, streakLevel * STREAK_BONUS_PER_LEVEL);
 }
 
 // Called when a word is completed
@@ -148,13 +150,14 @@ export function checkGreenSpawn(
   const inCooldown = Date.now() - lastMistakeAt < MISTAKE_COOLDOWN_MS;
   if (inCooldown) return;
 
+  // Calculate effective threshold (streak reduces it)
+  const reduction = getStreakThresholdReduction();
+  const effectiveThreshold = Math.floor(BASE_SPAWN_INTERVAL * (1 - reduction));
+
   // Check if enough words have been typed
-  if (wordsSinceGreenSpawn < BASE_SPAWN_INTERVAL) return;
+  if (wordsSinceGreenSpawn < effectiveThreshold) return;
 
-  // Apply streak-based probability bonus
-  const probability = getSpawnProbability();
-  if (Math.random() > probability / 100) return; // Random chance with streak bonus
-
+  // Spawn guaranteed once threshold is reached
   spawnGreen(currentWordIndex, currentCharIndex, words);
   wordsSinceGreenSpawn = 0;
 }
