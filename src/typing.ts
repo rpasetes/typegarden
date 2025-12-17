@@ -233,8 +233,8 @@ function handleSpace(): void {
     currentState.mistaken[wordIndex] = true;
     // Skipping with mistakes instantly expires any active golden
     expireGolden();
-  } else {
-    // Word completed correctly - trigger callback
+  } else if (!currentState.mistaken[wordIndex]) {
+    // Word completed correctly AND was never marked as mistaken - trigger callback
     if (onWordCompleteCallback) {
       onWordCompleteCallback();
     }
