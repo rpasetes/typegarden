@@ -1,7 +1,7 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
-import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden } from './golden.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo } from './golden.ts';
 
 export interface TypingState {
   words: string[];
@@ -282,6 +282,7 @@ function handleCharacter(char: string): void {
   } else {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
+    onTypo();
   }
 
   // Notify golden system of character typed (for spawn timing)

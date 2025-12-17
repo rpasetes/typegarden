@@ -74,6 +74,13 @@ export function getFadeDuration(): number {
   return activeGolden?.fadeDuration ?? 4000;
 }
 
+// Speed up fade when player makes a typo
+export function onTypo(): void {
+  if (!activeGolden) return;
+  // Cut remaining fade time by 25%
+  activeGolden.fadeDuration = Math.max(500, activeGolden.fadeDuration * 0.75);
+}
+
 // Convert word/char position to absolute character index
 function toAbsoluteIndex(wordIndex: number, charIndex: number, words: string[]): number {
   let abs = 0;
