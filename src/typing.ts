@@ -262,7 +262,7 @@ function handleCharacter(char: string): void {
   }
 
   // Notify golden system of character typed (for spawn timing)
-  onCharacterTyped(wordIndex, currentState.currentCharIndex, currentState.words);
+  onCharacterTyped(wordIndex, currentTyped.length, currentState.words);
 
   // No auto-complete in endless mode - user must press space to advance
 }
