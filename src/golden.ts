@@ -18,9 +18,13 @@ let activeGolden: GoldenLetter | null = null;
 const SPAWN_INTERVAL = 20;        // Spawn every ~20 characters typed
 const MIN_DISTANCE = 3;           // Minimum chars ahead
 const MAX_DISTANCE = 15;          // Maximum chars ahead
+const MISTAKE_COOLDOWN_MS = 2000; // Can't spawn for 2s after a mistake
 
 // Track characters typed since last spawn
 let charsSinceSpawn = 0;
+
+// Track last mistake for cooldown
+let lastMistakeAt = 0;
 
 // Callback for when golden is captured
 let onCaptureCallback: ((reward: number) => void) | null = null;
@@ -46,6 +50,7 @@ export function resetGolden(): void {
   }
   activeGolden = null;
   charsSinceSpawn = 0;
+  lastMistakeAt = 0;
 }
 
 export function getActiveGolden(): GoldenLetter | null {
@@ -76,6 +81,7 @@ export function getFadeDuration(): number {
 
 // Speed up fade when player makes a typo
 export function onTypo(): void {
+  lastMistakeAt = Date.now();
   if (!activeGolden) return;
   // Cut remaining fade time by 25%
   activeGolden.fadeDuration = Math.max(500, activeGolden.fadeDuration * 0.75);
@@ -116,8 +122,9 @@ export function onCharacterTyped(
 ): void {
   charsSinceSpawn++;
 
-  // Check for spawn
-  if (!activeGolden && charsSinceSpawn >= SPAWN_INTERVAL) {
+  // Check for spawn (skip if in cooldown from recent mistake)
+  const inCooldown = Date.now() - lastMistakeAt < MISTAKE_COOLDOWN_MS;
+  if (!activeGolden && charsSinceSpawn >= SPAWN_INTERVAL && !inCooldown) {
     spawnGolden(currentWordIndex, currentCharIndex, words);
     charsSinceSpawn = 0;
   }
