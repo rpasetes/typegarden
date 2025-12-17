@@ -85,10 +85,26 @@ export function onTypo(): void {
   if (!activeGolden) return;
   // Cut remaining fade time by 25%
   activeGolden.fadeDuration = Math.max(500, activeGolden.fadeDuration * 0.75);
+
+  // Reschedule timer to match new duration
+  if (expiryTimer) clearTimeout(expiryTimer);
+  const elapsed = Date.now() - activeGolden.spawnedAt;
+  const remaining = activeGolden.fadeDuration - elapsed;
+  expiryTimer = setTimeout(() => {
+    if (activeGolden) {
+      activeGolden = null;
+      expiryTimer = null;
+      if (onExpiryCallback) onExpiryCallback();
+    }
+  }, remaining + 50);
 }
 
 // Instantly expire golden when player skips a word with mistakes
 export function expireGolden(): void {
+  if (expiryTimer) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
   activeGolden = null;
 }
 
