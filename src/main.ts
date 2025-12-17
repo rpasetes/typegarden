@@ -7,6 +7,7 @@ import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden } from './golden.ts';
 import { getTypingState } from './typing.ts';
+import { spawnGoldenParticles, getCharacterPosition, spawnRewardText } from './particles.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
@@ -24,7 +25,17 @@ setOnSolChange((solState) => {
 });
 
 // Set up golden letter capture callback
-setOnGoldenCapture((reward) => {
+setOnGoldenCapture((reward, wordIndex, charIndex) => {
+  // Spawn particles from the captured letter's position (scaled by reward)
+  const pos = getCharacterPosition(wordIndex, charIndex);
+  if (pos) {
+    spawnGoldenParticles(pos.x, pos.y, reward as 1 | 2 | 3);
+  }
+
+  // Show floating reward text
+  spawnRewardText(reward);
+
+  // Earn the sol reward
   earnGoldenSol(reward as 1 | 2 | 3);
 });
 

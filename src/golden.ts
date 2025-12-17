@@ -26,8 +26,8 @@ let charsSinceSpawn = 0;
 // Track last mistake for cooldown
 let lastMistakeAt = 0;
 
-// Callback for when golden is captured
-let onCaptureCallback: ((reward: number) => void) | null = null;
+// Callback for when golden is captured (includes position for particles)
+let onCaptureCallback: ((reward: number, wordIndex: number, charIndex: number) => void) | null = null;
 
 // Callback for when golden expires (to trigger UI update)
 let onExpiryCallback: (() => void) | null = null;
@@ -35,7 +35,7 @@ let onExpiryCallback: (() => void) | null = null;
 // Timer for scheduled expiry
 let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function setOnGoldenCapture(callback: (reward: number) => void): void {
+export function setOnGoldenCapture(callback: (reward: number, wordIndex: number, charIndex: number) => void): void {
   onCaptureCallback = callback;
 }
 
@@ -199,10 +199,12 @@ export function captureGolden(): void {
   }
 
   const reward = activeGolden.reward;
+  const wordIndex = activeGolden.wordIndex;
+  const charIndex = activeGolden.charIndex;
   activeGolden = null;
 
   if (onCaptureCallback) {
-    onCaptureCallback(reward);
+    onCaptureCallback(reward, wordIndex, charIndex);
   }
 }
 
