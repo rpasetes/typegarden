@@ -81,6 +81,8 @@ export function getTypingSpeed(): number {
   if (recentStrokes.length < 2) return 0;
 
   const timeSpan = now - recentStrokes[0]!;
+  if (timeSpan === 0) return 0;
+
   const charsPerMs = recentStrokes.length / timeSpan;
   return charsPerMs * 1000;
 }
