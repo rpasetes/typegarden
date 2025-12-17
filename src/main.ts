@@ -1,88 +1,74 @@
 import './style.css';
-import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
-import type { TypingState } from './typing.ts';
-import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
+import { startTyping } from './typing.ts';
+import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeOutWords, fadeOutStats, fadeInWords, prepareWordsFadeIn } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, prepareWordsFadeIn, renderSolBar } from './ui.ts';
 import { generateWords } from './words.ts';
+import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
+import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden } from './golden.ts';
+import { getTypingState } from './typing.ts';
+import { spawnGoldenParticles, getCharacterPosition, spawnRewardText } from './particles.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
-let waitingForContinue = false;
-let sessionTotalTime = 0;
 let isRunActive = false;
 
-async function onRunComplete(state: TypingState): Promise<void> {
-  const wpm = calculateWPM(state);
-  const accuracy = calculateAccuracy(state);
-  const wordCount = state.words.length;
-  const duration = (state.endTime ?? Date.now()) - (state.startTime ?? Date.now());
+// Initialize sol state
+initSol(garden);
 
-  // Mark run as inactive
-  isRunActive = false;
-
-  // Accumulate only active typing time (excludes AFK)
-  sessionTotalTime += state.activeTime;
-
-  // Hide progress
-  hideProgress();
-
-  // Fade out words before showing stats
-  await fadeOutWords();
-
-  // Show final stats above typing area
-  renderStats(wpm, accuracy, duration, state.activeTime, sessionTotalTime);
-
-  // Save run to garden
-  garden = addRun(garden, {
-    timestamp: Date.now(),
-    wpm,
-    accuracy,
-    wordCount,
-    duration,
-    correctKeystrokes: state.correctKeystrokes,
-    incorrectKeystrokes: state.incorrectKeystrokes,
-  });
+// Set up sol change listener to update UI
+setOnSolChange((solState) => {
+  renderSolBar(solState.sessionSol);
+  // Update garden with sol state
+  garden = { ...garden, sessionSol: solState.sessionSol, lifetimeSol: solState.lifetimeSol };
   saveGarden(garden);
+});
 
-  // Show continue prompt and wait for space
-  renderContinuePrompt();
-  waitingForContinue = true;
+// Set up golden letter capture callback
+setOnGoldenCapture((reward, wordIndex, charIndex) => {
+  // Spawn particles from the captured letter's position (scaled by reward)
+  const pos = getCharacterPosition(wordIndex, charIndex);
+  if (pos) {
+    spawnGoldenParticles(pos.x, pos.y, reward as 1 | 2 | 3);
+  }
+
+  // Show floating reward text
+  spawnRewardText(reward);
+
+  // Earn the sol reward
+  earnGoldenSol(reward as 1 | 2 | 3);
+});
+
+// Set up golden letter expiry callback to trigger re-render
+setOnGoldenExpiry(() => {
+  const state = getTypingState();
+  if (state) renderWords(state);
+});
+
+function onWordComplete(): void {
+  earnBaseSol();
 }
 
-async function handleContinue(e: KeyboardEvent): Promise<void> {
-  // Hide overlay on any keypress
-  hideFocusOverlay();
-
-  if (!waitingForContinue) return;
-  if (e.key !== ' ') return;
-
-  e.preventDefault();
-  waitingForContinue = false;
-
-  // Fade out stats before starting new run
-  await fadeOutStats();
-  clearStats();
-  startNewRun();
-}
-
-function startNewRun(): void {
+function startTypingSession(): void {
   // Render fresh UI
   render(garden);
   resetScroll();
+  resetGolden();
 
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();
 
-  // Generate words — for now, 50 common words
-  // TODO: Tutorial flow will replace this
-  const words = generateWords({ type: 'common', count: 50 });
+  // Generate initial words
+  const words = generateWords({ type: 'common', count: 40 });
 
   // Mark run as active
   isRunActive = true;
 
-  // Start typing session (this calls renderWords)
-  startTyping(words, onRunComplete);
+  // Start typing session with word complete callback
+  startTyping(words, onWordComplete);
+
+  // Initial sol bar render
+  renderSolBar(getSolState().sessionSol);
 
   // Double RAF to ensure browser applies initial fade-out class before removing it
   requestAnimationFrame(() => {
@@ -96,13 +82,18 @@ export function getIsRunActive(): boolean {
   return isRunActive;
 }
 
+// Overlay handler to hide on any keypress
+function handleKeyPress(): void {
+  hideFocusOverlay();
+}
+
 // Initial render and start
 render(garden);
 initCursorIdleDetection();
-document.addEventListener('keydown', handleContinue);
+document.addEventListener('keydown', handleKeyPress);
 
 // Focus overlay - show only on blur, not on load
 window.addEventListener('blur', showFocusOverlay);
 window.addEventListener('focus', hideFocusOverlay);
 
-startNewRun();
+startTypingSession();

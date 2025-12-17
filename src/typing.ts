@@ -1,5 +1,7 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
+import { generateWords } from './words.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden } from './golden.ts';
 
 export interface TypingState {
   words: string[];
@@ -17,12 +19,18 @@ export interface TypingState {
 }
 
 export type TypingCompleteCallback = (state: TypingState) => void;
+export type WordCompleteCallback = () => void;
 
 let currentState: TypingState | null = null;
 let onCompleteCallback: TypingCompleteCallback | null = null;
+let onWordCompleteCallback: WordCompleteCallback | null = null;
 
 // Max gap between keystrokes before considered AFK (5 seconds)
 const AFK_THRESHOLD_MS = 5000;
+
+// Typing speed tracking (rolling window)
+const SPEED_WINDOW_SIZE = 15;
+const keystrokeTimestamps: number[] = [];
 
 export function createTypingState(words: string[]): TypingState {
   return {
@@ -41,6 +49,14 @@ export function createTypingState(words: string[]): TypingState {
   };
 }
 
+export function appendWords(newWords: string[]): void {
+  if (!currentState) return;
+
+  currentState.words.push(...newWords);
+  currentState.typed.push(...newWords.map(() => ''));
+  currentState.mistaken.push(...newWords.map(() => false));
+}
+
 export function calculateWPM(state: TypingState): number {
   if (!state.startTime) return 0;
   const endTime = state.endTime ?? Date.now();
@@ -54,6 +70,21 @@ export function calculateAccuracy(state: TypingState): number {
   const total = state.correctKeystrokes + state.incorrectKeystrokes;
   if (total === 0) return 100;
   return Math.round((state.correctKeystrokes / total) * 100);
+}
+
+export function getTypingSpeed(): number {
+  if (keystrokeTimestamps.length < 2) return 0;
+
+  const now = Date.now();
+  const recentStrokes = keystrokeTimestamps.filter(ts => now - ts < 5000);
+
+  if (recentStrokes.length < 2) return 0;
+
+  const timeSpan = now - recentStrokes[0]!;
+  if (timeSpan === 0) return 0;
+
+  const charsPerMs = recentStrokes.length / timeSpan;
+  return charsPerMs * 1000;
 }
 
 function trackActiveTime(): void {
@@ -119,10 +150,7 @@ function handleKeydown(e: KeyboardEvent): void {
   if (key.length === 1) {
     e.preventDefault();
     handleCharacter(key);
-    // Only render if run is still active (not completed)
-    if (currentState && !currentState.endTime) {
-      renderWords(currentState);
-    }
+    renderWords(currentState);
     return;
   }
 }
@@ -203,18 +231,28 @@ function handleSpace(): void {
 
   if (isIncomplete || hasErrors) {
     currentState.mistaken[wordIndex] = true;
-  }
-
-  // Check if we're at the last word
-  if (wordIndex >= currentState.words.length - 1) {
-    // Complete the run
-    completeRun();
-    return;
+    // Skipping with mistakes instantly expires any active golden
+    expireGolden();
+  } else if (!currentState.mistaken[wordIndex]) {
+    // Word completed correctly AND was never marked as mistaken - trigger callback
+    if (onWordCompleteCallback) {
+      onWordCompleteCallback();
+    }
   }
 
   // Advance to next word
   currentState.currentWordIndex++;
   currentState.currentCharIndex = 0;
+
+  // Check if golden letter was passed (skipped without capturing)
+  checkPassed(currentState.currentWordIndex, currentState.currentCharIndex, currentState.words);
+
+  // Check if we need more words (endless mode)
+  const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
+  if (wordsRemaining < 10) {
+    const newWords = generateWords({ type: 'common', count: 15 });
+    appendWords(newWords);
+  }
 }
 
 function handleCharacter(char: string): void {
@@ -234,43 +272,44 @@ function handleCharacter(char: string): void {
   const expectedChar = currentWord[currentTyped.length];
   if (char === expectedChar) {
     currentState.correctKeystrokes++;
+
+    // Track keystroke timing for speed calculation
+    keystrokeTimestamps.push(Date.now());
+    if (keystrokeTimestamps.length > SPEED_WINDOW_SIZE) {
+      keystrokeTimestamps.shift();
+    }
+
+    // Check for golden letter capture (only on correct keystroke)
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      captureGolden();
+    }
   } else {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
+    onTypo();
+
+    // Mistyping the golden letter itself loses the bonus entirely
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      expireGolden();
+    }
   }
 
-  // Auto-complete: if last word and typed length matches word length
-  const isLastWord = wordIndex === currentState.words.length - 1;
-  const newTypedLength = currentTyped.length + 1;
-  if (isLastWord && newTypedLength >= currentWord.length) {
-    completeRun();
-  }
-}
+  // Notify golden system of character typed (for spawn timing)
+  onCharacterTyped(wordIndex, currentTyped.length, currentState.words);
 
-function completeRun(): void {
-  if (!currentState) return;
-
-  currentState.endTime = Date.now();
-
-  // Remove keyboard listener
-  document.removeEventListener('keydown', handleKeydown);
-
-  // Trigger callback
-  if (onCompleteCallback) {
-    onCompleteCallback(currentState);
-  }
+  // No auto-complete in endless mode - user must press space to advance
 }
 
 export function startTyping(
   words: string[],
-  onComplete?: TypingCompleteCallback
+  onWordComplete?: WordCompleteCallback
 ): TypingState {
   // Clean up previous listener if any
   document.removeEventListener('keydown', handleKeydown);
 
   // Create fresh state
   currentState = createTypingState(words);
-  onCompleteCallback = onComplete ?? null;
+  onWordCompleteCallback = onWordComplete ?? null;
 
   // Render initial state
   renderWords(currentState);

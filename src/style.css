@@ -83,6 +83,17 @@ body {
   display: inline;
 }
 
+.char.char-new {
+  opacity: 0;
+  animation: char-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes char-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
 .char {
   position: relative;
   transition: color 0.05s ease;
@@ -103,6 +114,16 @@ body {
 .char.extra {
   color: var(--text-error);
   opacity: 0.7;
+}
+
+.char.golden {
+  color: var(--accent);
+  animation: golden-fade var(--golden-fade-duration, 4s) ease-out forwards;
+}
+
+@keyframes golden-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0.3; }
 }
 
 /* Cursor — height anchored to font size via em */
@@ -298,6 +319,99 @@ body {
   font-size: 0.875rem;
 }
 
+/* Sol Bar */
+.sol-bar {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  color: var(--text-typed);
+  background: var(--bg-soft);
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--text-dim);
+  z-index: 50;
+}
+
+.sol-icon {
+  font-size: 1.5rem;
+}
+
+.sol-count {
+  font-weight: 500;
+  color: var(--accent);
+}
+
+/* Golden Particles */
+.golden-particle {
+  position: fixed;
+  background: var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1000;
+  animation: particle-flight 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.golden-particle--small {
+  width: 4px;
+  height: 4px;
+  box-shadow: 0 0 4px var(--accent);
+}
+
+.golden-particle--medium {
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 8px var(--accent), 0 0 12px var(--accent);
+}
+
+.golden-particle--large {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 12px var(--accent), 0 0 20px var(--accent), 0 0 30px var(--accent);
+}
+
+/* Floating reward text */
+.reward-text {
+  position: fixed;
+  transform: translateX(-50%);
+  color: var(--accent);
+  font-size: 1.25rem;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 1001;
+  text-shadow: 0 0 8px var(--accent);
+  animation: reward-float 0.8s ease-out forwards;
+}
+
+@keyframes reward-float {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-30px);
+  }
+}
+
+@keyframes particle-flight {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  15% {
+    transform: translate(var(--burst-x), var(--burst-y)) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--target-x), var(--target-y)) scale(0.5);
+    opacity: 0;
+  }
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   :root {
@@ -317,5 +431,16 @@ body {
 
   .upgrade-name {
     min-width: auto;
+  }
+
+  .sol-bar {
+    bottom: 1rem;
+    right: 1rem;
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .sol-icon {
+    font-size: 1.25rem;
   }
 }
