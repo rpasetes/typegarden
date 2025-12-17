@@ -18,7 +18,6 @@ let activeGolden: GoldenLetter | null = null;
 const SPAWN_INTERVAL = 20;        // Spawn every ~20 characters typed
 const MIN_DISTANCE = 3;           // Minimum chars ahead
 const MAX_DISTANCE = 15;          // Maximum chars ahead
-const EXPIRY_MS = 5000;           // Fade after 5 seconds
 
 // Track characters typed since last spawn
 let charsSinceSpawn = 0;
@@ -127,23 +126,25 @@ function spawnGolden(
 
   if (!target) return; // Not enough words ahead
 
+  const fadeDuration = calculateFadeDuration();
+
   activeGolden = {
     wordIndex: target.wordIndex,
     charIndex: target.charIndex,
     spawnedAt: Date.now(),
     reward: getRewardForDistance(distance),
-    fadeDuration: calculateFadeDuration(),
+    fadeDuration,
   };
 
-  // Schedule expiry check to update UI when golden times out
+  // Schedule expiry to match fade duration
   if (expiryTimer) clearTimeout(expiryTimer);
   expiryTimer = setTimeout(() => {
-    if (activeGolden && Date.now() - activeGolden.spawnedAt >= EXPIRY_MS) {
+    if (activeGolden) {
       activeGolden = null;
       expiryTimer = null;
       if (onExpiryCallback) onExpiryCallback();
     }
-  }, EXPIRY_MS + 50); // Small buffer to ensure animation completes
+  }, fadeDuration + 50); // Expire when fade animation completes
 }
 
 // Check if a position is the golden letter
@@ -174,7 +175,8 @@ export function captureGolden(): void {
 export function checkExpiry(): boolean {
   if (!activeGolden) return false;
 
-  if (Date.now() - activeGolden.spawnedAt > EXPIRY_MS) {
+  // Expiry based on dynamic fade duration
+  if (Date.now() - activeGolden.spawnedAt > activeGolden.fadeDuration) {
     activeGolden = null;
     return true; // Was expired
   }
