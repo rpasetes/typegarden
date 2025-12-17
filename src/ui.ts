@@ -154,25 +154,26 @@ export function renderWords(state: TypingState): void {
         activeGolden.charIndex === charIndex &&
         !isTyped;
 
-      // Update typing state classes (preserve char-new if present, but not for golden letters)
+      // Update typing state classes
       const hasCharNew = charEl.classList.contains('char-new') && !isGolden;
       const wasGolden = charEl.classList.contains('golden');
 
-      // Only update class if golden state changed (prevents animation restart)
-      if (isGolden && !wasGolden) {
+      // Preserve golden animation - skip class updates if element should stay golden
+      if (wasGolden && isGolden) {
+        // Don't touch className - preserve animation
+      } else if (isGolden && !wasGolden) {
         // Becoming golden - set class and fade duration
         charEl.className = `char untyped golden`;
         const fadeDuration = getFadeDuration();
         charEl.style.setProperty('--golden-fade-duration', `${fadeDuration}ms`);
-      } else if (!isGolden && wasGolden) {
+      } else if (wasGolden && !isGolden) {
         // No longer golden - remove golden styling
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
         charEl.style.removeProperty('--golden-fade-duration');
-      } else if (!isGolden) {
+      } else {
         // Normal update (not golden)
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
       }
-      // If isGolden && wasGolden, don't touch it - preserve animation
 
       // Update cursor target
       charEl.removeAttribute('data-cursor-target');
