@@ -2,6 +2,7 @@ import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
+import { getActiveGolden, getFadeDuration } from './golden.ts';
 
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
@@ -87,6 +88,9 @@ export function renderWords(state: TypingState): void {
   // Track char offset for new word animations
   let newCharOffset = 0;
 
+  // Get active golden letter once outside the loop
+  const activeGolden = getActiveGolden();
+
   for (let wordIndex = 0; wordIndex < state.words.length; wordIndex++) {
     const word = state.words[wordIndex] ?? '';
     const typed = state.typed[wordIndex] ?? '';
@@ -145,10 +149,31 @@ export function renderWords(state: TypingState): void {
       const typedChar = typed[charIndex];
       const isCorrect = typedChar === word[charIndex];
       const isTyped = typedChar !== undefined;
+      const isGolden = activeGolden &&
+        activeGolden.wordIndex === wordIndex &&
+        activeGolden.charIndex === charIndex &&
+        !isTyped;
 
-      // Update typing state classes (preserve char-new if present)
-      const hasCharNew = charEl.classList.contains('char-new');
-      charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+      // Update typing state classes
+      const hasCharNew = charEl.classList.contains('char-new') && !isGolden;
+      const wasGolden = charEl.classList.contains('golden');
+
+      // Preserve golden animation - skip class updates if element should stay golden
+      if (wasGolden && isGolden) {
+        // Don't touch className - preserve animation
+      } else if (isGolden && !wasGolden) {
+        // Becoming golden - set class and fade duration
+        charEl.className = `char untyped golden`;
+        const fadeDuration = getFadeDuration();
+        charEl.style.setProperty('--golden-fade-duration', `${fadeDuration}ms`);
+      } else if (wasGolden && !isGolden) {
+        // No longer golden - remove golden styling
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+        charEl.style.removeProperty('--golden-fade-duration');
+      } else {
+        // Normal update (not golden)
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+      }
 
       // Update cursor target
       charEl.removeAttribute('data-cursor-target');
