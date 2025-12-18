@@ -635,6 +635,7 @@ export function renderTutorialStatsModal(
   accuracy: number,
   maxChain: number,
   elapsedMs: number,
+  totalSol: number,
   onRedeem: () => void
 ): void {
   const app = document.getElementById('app');
@@ -667,7 +668,7 @@ export function renderTutorialStatsModal(
           <span class="tutorial-stat-label">time</span>
         </div>
       </div>
-      <p class="tutorial-redeem-prompt">press space to redeem sol</p>
+      <p class="tutorial-redeem-prompt">press space to redeem ${totalSol} sol</p>
     </div>
   `;
 

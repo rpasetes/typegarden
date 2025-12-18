@@ -4,12 +4,26 @@ import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
 import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow } from './ui.ts';
 import { generateWords } from './words.ts';
-import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
+import { initSol, earnBaseSol, earnGoldenSol, earnBonusSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
 import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
 import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
+
+// Calculate performance bonus multiplier
+function calculatePerformanceBonus(wpm: number, accuracy: number, maxChain: number): number {
+  // WPM bonus: 0-50% (60 WPM = 25%, 120+ WPM = 50%)
+  const wpmBonus = Math.min(0.5, wpm / 240);
+
+  // Accuracy bonus: 0-50% (100% = 50%, 90% = 25%, <80% = 0%)
+  const accuracyBonus = accuracy >= 80 ? (accuracy - 80) * 0.025 : 0;
+
+  // Chain bonus: 0-100% (10 = ~33%, 30+ = 100%)
+  const chainBonus = Math.min(1, maxChain / 30);
+
+  return 1 + wpmBonus + accuracyBonus + chainBonus;
+}
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
@@ -199,7 +213,18 @@ function handleTutorialPhaseComplete(): void {
     const maxChain = getMaxChain();
     const elapsedTime = getTutorialElapsedTime();
 
-    renderTutorialStatsModal(wpm, accuracy, maxChain, elapsedTime, () => {
+    // Calculate total sol with performance bonus
+    const baseSol = getSolState().sessionSol;
+    const bonusMultiplier = calculatePerformanceBonus(wpm, accuracy, maxChain);
+    const totalSol = Math.floor(baseSol * bonusMultiplier);
+
+    renderTutorialStatsModal(wpm, accuracy, maxChain, elapsedTime, totalSol, () => {
+      // Apply bonus sol
+      const bonusSol = totalSol - baseSol;
+      if (bonusSol > 0) {
+        earnBonusSol(bonusSol);
+      }
+
       // Yellow screen glow on redemption
       triggerScreenGlow();
 

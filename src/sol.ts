@@ -49,3 +49,7 @@ export function earnBaseSol(): void {
 export function earnGoldenSol(tier: 1 | 2 | 3): void {
   addSol(tier);
 }
+
+export function earnBonusSol(amount: number): void {
+  addSol(amount);
+}
