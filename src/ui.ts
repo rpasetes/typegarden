@@ -182,7 +182,7 @@ export function renderWords(state: TypingState): void {
       const isGreen = inUpdateWindow && !isAnimating && isGreenPosition(wordIndex, charIndex) && !isTyped;
 
       // Update typing state classes
-      const hasCharNew = charEl.classList.contains('char-new') && !isGolden && !isGreen;
+      const hasCharNew = charEl.classList.contains('char-new');
       const wasGolden = charEl.classList.contains('golden');
       const wasGreen = charEl.classList.contains('green');
 
@@ -203,17 +203,20 @@ export function renderWords(state: TypingState): void {
         // No longer golden - remove golden styling
         // In fever mode, all untyped letters are golden
         const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${feverGolden}`;
+        const charNew = hasCharNew && !isGolden && !isGreen ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
         if (!feverGolden) charEl.style.removeProperty('--golden-fade-duration');
       } else if (wasGreen && !isGreen) {
         // No longer green - remove green styling
         const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${feverGolden}`;
+        const charNew = hasCharNew && !isGolden && !isGreen ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
       } else {
         // Normal update (not golden or green)
-        // In fever mode, all untyped letters are golden
+        // In fever mode, all untyped letters are golden (preserve char-new for fade-in)
         const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${feverGolden}`;
+        const charNew = hasCharNew ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
       }
 
       // Update cursor target

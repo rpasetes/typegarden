@@ -566,8 +566,13 @@ body {
 body.fever-mode .char.golden {
   color: #b8bb26;
   text-shadow: 0 0 8px #b8bb26;
-  animation: none; /* No fade - letters stay until typed */
   opacity: 1;
+}
+
+/* Fever golden letters still get the fade-in animation */
+body.fever-mode .char.golden.char-new {
+  opacity: 0;
+  animation: char-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 body.fever-mode .golden-particle {
