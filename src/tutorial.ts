@@ -23,7 +23,7 @@ export interface FeverStats {
 // Tutorial prompt text content
 export const TUTORIAL_PROMPTS = {
   intro: "welcome to typegarden, a game that grows the more you type: handcrafted by russell antonie pasetes.",
-  mechanics: "every correct word you type gains you more sol. think of it as sunlight for your garden. you are free to make any mistakes, as long as you keep moving forward. over time you will notice golden letters fade into view as you continue typing. catch them in time and you'll gain a burst of sol for your garden. be sure to stay in flow, these characters can be quite tricky to catch if you're not careful. sometimes, rarer characters appear that are colored differently from the usual golden letter! pop them for something special,",
+  mechanics: "every correct word you type gains you more sol. think of it as sunlight for your garden. you are free to make any mistakes, as long as you keep moving forward. over time you will notice golden letters appear as you type. catch them in time to gain a sol burst. stay in flow and you will catch more golden letters. sometimes, rarer characters appear that are colored differently from the usual golden letter. pop them for something special!",
   fever: "placeholder text for fever mode demo content that will be provided later and should be approximately one hundred words in length to match the fever rush duration specification from the tutorial plan document", // TBD: Custom 100-word demo message
 };
 
