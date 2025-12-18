@@ -751,6 +751,7 @@ export function renderQRModal(url: string): void {
     <div class="qr-content">
       <img src="${qrUrl}" alt="QR Code" class="qr-image" />
       <p class="qr-url">${url}</p>
+      <p class="qr-url">reach me at russellpasetes.com</p>
       <p class="qr-dismiss">press any key to dismiss</p>
     </div>
   `;
