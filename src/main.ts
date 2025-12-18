@@ -2,7 +2,7 @@ import './style.css';
 import { startTyping } from './typing.ts';
 import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow, renderQRModal } from './ui.ts';
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, earnBonusSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
@@ -69,7 +69,7 @@ setOnGoldenExpiry(() => {
 // Track if green has been captured to prevent duplicate phase advance
 let greenCaptured = false;
 
-// Set up green letter capture callback (triggers fever mode)
+// Set up green letter capture callback (triggers fever mode or QR modal)
 setOnGreenCapture(() => {
   // Green captured during mechanics phase - transition to fever
   if (getCurrentPhase() === 'mechanics' && !greenCaptured) {
@@ -78,6 +78,10 @@ setOnGreenCapture(() => {
       advancePhase(); // moves to 'fever'
       startTutorialPhase('fever');
     });
+  }
+  // Green captured in endless mode (after tutorial) - show QR modal
+  if (getCurrentPhase() === null && garden.tutorialComplete) {
+    renderQRModal('https://typegarden.vercel.app');
   }
 });
 
@@ -264,13 +268,17 @@ function startEndlessWithEnjoy(): void {
   render(garden);
   resetScroll();
   resetGolden();
+  resetGreen();
+
+  // Set green letter at "?" in "time?" (word index 9, char index 4)
+  setGreenLetterPosition(9, 4);
 
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();
 
-  // Generate words starting with "thanks and enjoy"
-  const additionalWords = generateWords({ type: 'common', count: 37 });
-  const words = ['thanks', 'and', 'enjoy', ...additionalWords];
+  // Generate words starting with challenge prompt
+  const additionalWords = generateWords({ type: 'common', count: 30 });
+  const words = ['thanks', 'and', 'enjoy,', 'think', 'you', 'can', 'beat', 'my', 'demo', 'time?', ...additionalWords];
 
   // Mark run as active
   isRunActive = true;

@@ -734,3 +734,39 @@ export function triggerScreenGlow(): void {
   document.body.appendChild(glow);
   setTimeout(() => glow.remove(), 800);
 }
+
+// QR code modal for sharing
+export function renderQRModal(url: string): void {
+  // Don't show if already visible
+  if (document.querySelector('.qr-modal')) return;
+
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+
+  const modal = document.createElement('div');
+  modal.className = 'qr-modal';
+  modal.innerHTML = `
+    <div class="qr-content">
+      <img src="${qrUrl}" alt="QR Code" class="qr-image" />
+      <p class="qr-url">${url}</p>
+      <p class="qr-dismiss">press any key to dismiss</p>
+    </div>
+  `;
+
+  // Dismiss on any key
+  const keyHandler = (e: KeyboardEvent) => {
+    e.preventDefault();
+    document.removeEventListener('keydown', keyHandler);
+    modal.classList.add('fade-out');
+    setTimeout(() => modal.remove(), 300);
+  };
+
+  // Delay adding listener so the "?" keystroke doesn't immediately dismiss
+  setTimeout(() => {
+    document.addEventListener('keydown', keyHandler);
+  }, 100);
+
+  app.appendChild(modal);
+}

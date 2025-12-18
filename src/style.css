@@ -562,6 +562,43 @@ body {
   }
 }
 
+/* QR Code Modal */
+.qr-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 40, 40, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.3s ease;
+}
+
+.qr-modal.fade-out {
+  animation: fadeOut 0.3s ease forwards;
+}
+
+.qr-content {
+  text-align: center;
+}
+
+.qr-image {
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.qr-url {
+  color: var(--accent);
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.qr-dismiss {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
 /* Fever Mode: Green Theme */
 body.fever-mode .char.golden {
   color: #b8bb26;
