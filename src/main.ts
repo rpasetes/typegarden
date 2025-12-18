@@ -5,7 +5,7 @@ import type { GardenState } from './garden.ts';
 import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut } from './ui.ts';
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
-import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval } from './golden.ts';
+import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
 import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, type TutorialPhase } from './tutorial.ts';
@@ -99,6 +99,9 @@ function startTutorialPhase(phase: TutorialPhase): void {
   render(garden);
   resetScroll();
   resetGolden();
+
+  // Set golden start word index (after resetGolden which clears it)
+  setGoldenStartWordIndex(config.goldenStartWordIndex);
 
   // Hide sol bar for intro phase
   if (!config.solBarVisible) {

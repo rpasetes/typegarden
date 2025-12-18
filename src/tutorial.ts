@@ -9,6 +9,7 @@ export interface TutorialPhaseConfig {
   words: string[];
   goldenEnabled: boolean;
   goldenSpawnInterval: number;
+  goldenStartWordIndex: number;
   greenLetterPosition: { wordIndex: number; charIndex: number } | null;
   solBarVisible: boolean;
 }
@@ -94,6 +95,26 @@ function findGreenLetterPosition(): { wordIndex: number; charIndex: number } | n
   return null;
 }
 
+// Find the word index where sentence N starts (1-indexed)
+// Sentences end with . ! or ?
+function findSentenceStartWordIndex(sentenceNumber: number): number {
+  const words = TUTORIAL_PROMPTS.mechanics.split(' ');
+  let currentSentence = 1;
+
+  if (sentenceNumber <= 1) return 0;
+
+  for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
+    const word = words[wordIndex];
+    if (word && /[.!?]$/.test(word)) {
+      currentSentence++;
+      if (currentSentence === sentenceNumber) {
+        return wordIndex + 1; // Next word starts the new sentence
+      }
+    }
+  }
+  return 0;
+}
+
 export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
   switch (phase) {
     case 'intro':
@@ -101,6 +122,7 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         words: TUTORIAL_PROMPTS.intro.split(' '),
         goldenEnabled: false,
         goldenSpawnInterval: 20,
+        goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: false,
       };
@@ -110,6 +132,7 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         words: TUTORIAL_PROMPTS.mechanics.split(' '),
         goldenEnabled: true,
         goldenSpawnInterval: 20, // Normal spawn rate
+        goldenStartWordIndex: findSentenceStartWordIndex(4), // Golden starts at sentence 4
         greenLetterPosition: findGreenLetterPosition(),
         solBarVisible: true,
       };
@@ -119,6 +142,7 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         words: TUTORIAL_PROMPTS.fever.split(' '),
         goldenEnabled: true,
         goldenSpawnInterval: 10, // 2x density
+        goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: true,
       };
@@ -128,6 +152,7 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         words: [],
         goldenEnabled: true,
         goldenSpawnInterval: 20,
+        goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: true,
       };

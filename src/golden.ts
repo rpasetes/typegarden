@@ -26,6 +26,9 @@ let spawnInterval = DEFAULT_SPAWN_INTERVAL;
 // Enable/disable golden spawning (for tutorial phases)
 let goldenEnabled = true;
 
+// Minimum word index before golden can spawn (for tutorial delayed start)
+let goldenStartWordIndex = 0;
+
 // Track characters typed since last spawn
 let charsSinceSpawn = 0;
 
@@ -53,6 +56,10 @@ export function setGoldenEnabled(enabled: boolean): void {
   goldenEnabled = enabled;
 }
 
+export function setGoldenStartWordIndex(wordIndex: number): void {
+  goldenStartWordIndex = wordIndex;
+}
+
 export function setSpawnInterval(interval: number): void {
   spawnInterval = interval;
 }
@@ -69,6 +76,7 @@ export function resetGolden(): void {
   activeGolden = null;
   charsSinceSpawn = 0;
   lastMistakeAt = 0;
+  goldenStartWordIndex = 0;
 }
 
 export function getActiveGolden(): GoldenLetter | null {
@@ -156,6 +164,9 @@ export function onCharacterTyped(
 ): void {
   // Skip if golden spawning is disabled (tutorial intro phase)
   if (!goldenEnabled) return;
+
+  // Skip if we haven't reached the start word index yet (tutorial delayed start)
+  if (currentWordIndex < goldenStartWordIndex) return;
 
   charsSinceSpawn++;
 
