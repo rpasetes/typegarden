@@ -28,7 +28,7 @@ export interface FeverStats {
 export const TUTORIAL_PROMPTS = {
   intro: "welcome to typegarden, a game that grows the more you type: handcrafted by russell antonie pasetes.",
   mechanics: "every correct word you type gains you more sol. think of it as sunlight for your garden. you are free to make any mistakes, as long as you keep moving forward. over time you will notice golden letters appear as you type. catch them in time to gain a sol burst. stay in flow and you will catch more golden letters. sometimes, rarer characters appear that are different from the usual golden letter. type them to trigger something special!",
-  fever: "yooo welcome to fever mode lmao every letter is golden now so just go crazy and collect everything you can. dont mess up tho or your chain breaks and thats kinda sad. anyway yeah this is just filler text to make the demo long enough so keep typing i guess. almost there probably. gg wp see ya"
+  fever: "yooo welcome to fever mode lmao every letter is golden now so just go crazy and collect everything you can. dont mess up tho or your chain breaks and thats kinda sad. anyway yeah ive been practicing this demo so many times im actually so tired rn. did i get a perfect streak so far? someone in the audience let me know. almost done i think. gg wp see ya"
 };
 
 // Current tutorial state
