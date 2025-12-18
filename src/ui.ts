@@ -2,6 +2,30 @@ import type { GardenState } from './garden.ts';
 import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
+import { getActiveGolden, getFadeDuration } from './golden.ts';
+import { isGreenPosition, getActiveGreen } from './green.ts';
+
+// Track the highest word index we've rendered (for detecting new words)
+let highestRenderedIndex = -1;
+
+// Track if all letters should be green (fever mode)
+let allLettersGreenMode = false;
+
+export function setAllLettersGreen(enabled: boolean): void {
+  allLettersGreenMode = enabled;
+}
+
+// Track when each word's animation completes (wordIndex -> completion timestamp)
+const animatingUntil = new Map<number, number>();
+
+// Animation duration in ms (matches CSS: 0.4s animation + max stagger delay)
+const ANIMATION_DURATION_MS = 600;
+
+// Reset when starting new session
+export function resetRenderedTracking(): void {
+  highestRenderedIndex = -1;
+  animatingUntil.clear();
+}
 
 export function setCursorActive(): void {
   const cursor = document.getElementById('cursor');
@@ -36,6 +60,9 @@ export function render(garden: GardenState): void {
   const app = document.getElementById('app');
   if (!app) return;
 
+  // Reset tracking for new session
+  resetRenderedTracking();
+
   // Apply any active upgrade effects
   applyUpgradeEffects(garden.activeUpgrades);
 
@@ -47,81 +74,208 @@ export function render(garden: GardenState): void {
         <div id="cursor" class="cursor"></div>
       </div>
       <div id="stats" class="above-viewport stats"></div>
+      <div id="sol-bar" class="sol-bar"></div>
     </main>
   `;
 }
+
+// Only animate words within this range of current position
+const ANIMATE_AHEAD = 25;
+
+// Only update character states within this window (performance optimization)
+const UPDATE_WINDOW_BEHIND = 1;
+const UPDATE_WINDOW_AHEAD = 5;
 
 export function renderWords(state: TypingState): void {
   const wordsEl = document.getElementById('words');
   if (!wordsEl) return;
 
-  // Track if cursor should be at end of a character (right edge)
+  const now = Date.now();
+  const isInitialRender = highestRenderedIndex === -1;
   let cursorAtEnd = false;
 
-  const wordElements = state.words.map((word, wordIndex) => {
+  // Get existing word elements
+  const existingWords = wordsEl.querySelectorAll('.word');
+
+  // Track char offset for new word animations
+  let newCharOffset = 0;
+
+  // Get active golden/green letters once outside the loop
+  const activeGolden = getActiveGolden();
+  const activeGreen = getActiveGreen();
+
+  for (let wordIndex = 0; wordIndex < state.words.length; wordIndex++) {
+    const word = state.words[wordIndex] ?? '';
     const typed = state.typed[wordIndex] ?? '';
     const isCurrentWord = wordIndex === state.currentWordIndex;
     const isPastWord = wordIndex < state.currentWordIndex;
+    const isMistaken = state.mistaken[wordIndex] ?? false;
+    const isNewWord = wordIndex > highestRenderedIndex;
 
-    const chars = word.split('').map((char, charIndex) => {
-      const typedChar = typed[charIndex];
-      let className = 'char';
-      let dataAttr = '';
+    // Schedule animation for new words
+    if (isNewWord && (isInitialRender || wordIndex < state.currentWordIndex + ANIMATE_AHEAD)) {
+      const animationEndTime = now + ANIMATION_DURATION_MS + (newCharOffset + word.length) * 12;
+      animatingUntil.set(wordIndex, animationEndTime);
+    }
 
-      if (typedChar === undefined) {
-        // Untyped: gray/dim to prompt typing
-        className += ' untyped';
-      } else if (typedChar === char) {
-        // Correct: white
-        className += ' correct';
-      } else {
-        // Incorrect: red
-        className += ' incorrect';
-      }
+    const isAnimating = animatingUntil.has(wordIndex) && now < (animatingUntil.get(wordIndex) ?? 0);
 
-      // Mark cursor target (at start of this char)
-      if (isCurrentWord && charIndex === state.currentCharIndex) {
-        dataAttr = ' data-cursor-target="true"';
-      }
+    // Check if word element already exists
+    let wordEl = existingWords[wordIndex] as HTMLElement | undefined;
 
-      // Mark cursor at end of last typed char
-      if (isCurrentWord && charIndex === state.currentCharIndex - 1 && state.currentCharIndex === typed.length && typed.length <= word.length) {
-        dataAttr = ' data-cursor-target="true" data-cursor-end="true"';
-        cursorAtEnd = true;
-      }
+    if (!wordEl) {
+      // Create new word element
+      wordEl = document.createElement('span');
+      wordEl.className = 'word';
 
-      return `<span class="${className}"${dataAttr}>${char}</span>`;
-    });
+      // Create character spans
+      for (let charIndex = 0; charIndex < word.length; charIndex++) {
+        const charEl = document.createElement('span');
+        charEl.className = 'char untyped';
+        charEl.textContent = word[charIndex] ?? '';
 
-    // Extra characters typed beyond word length
-    if (typed.length > word.length) {
-      const extra = typed.slice(word.length);
-      for (let i = 0; i < extra.length; i++) {
-        const extraIndex = word.length + i;
-        const isLastTyped = extraIndex === typed.length - 1;
-        let dataAttr = '';
-
-        // Cursor at end of last extra char
-        if (isCurrentWord && isLastTyped && state.currentCharIndex === typed.length) {
-          dataAttr = ' data-cursor-target="true" data-cursor-end="true"';
-          cursorAtEnd = true;
+        if (isAnimating) {
+          const charOffset = newCharOffset + charIndex;
+          charEl.classList.add('char-new');
+          charEl.style.animationDelay = `${charOffset * 12}ms`;
         }
 
-        chars.push(`<span class="char extra incorrect"${dataAttr}>${extra[i]}</span>`);
+        wordEl.appendChild(charEl);
+      }
+
+      // Add space text node between words (except for first word)
+      if (wordIndex > 0) {
+        wordsEl.appendChild(document.createTextNode(' '));
+      }
+      wordsEl.appendChild(wordEl);
+    }
+
+    // Update word classes
+    wordEl.className = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
+
+    // Skip character state updates for words outside the update window (performance)
+    const inUpdateWindow = wordIndex >= state.currentWordIndex - UPDATE_WINDOW_BEHIND &&
+                           wordIndex <= state.currentWordIndex + UPDATE_WINDOW_AHEAD;
+    // Always update words containing golden or green letters
+    const hasGolden = activeGolden && activeGolden.wordIndex === wordIndex;
+    const hasGreen = activeGreen && activeGreen.wordIndex === wordIndex;
+
+    if (!inUpdateWindow && !hasGolden && !hasGreen) {
+      if (isNewWord) newCharOffset += word.length + 1;
+      continue;
+    }
+
+    // Update character states
+    const charEls = wordEl.querySelectorAll('.char:not(.extra)');
+    for (let charIndex = 0; charIndex < word.length; charIndex++) {
+      const charEl = charEls[charIndex] as HTMLElement | undefined;
+      if (!charEl) continue;
+
+      const typedChar = typed[charIndex];
+      const isCorrect = typedChar === word[charIndex];
+      const isTyped = typedChar !== undefined;
+      const isGolden = activeGolden &&
+        activeGolden.wordIndex === wordIndex &&
+        activeGolden.charIndex === charIndex &&
+        !isTyped;
+      // Only show green letter after fade-in animation completes
+      const isGreen = inUpdateWindow && !isAnimating && isGreenPosition(wordIndex, charIndex) && !isTyped;
+
+      // Update typing state classes
+      const hasCharNew = charEl.classList.contains('char-new');
+      const wasGolden = charEl.classList.contains('golden');
+      const wasGreen = charEl.classList.contains('green');
+
+      // Preserve golden/green animation - skip class updates if element should stay special
+      if (wasGolden && isGolden) {
+        // Don't touch className - preserve animation
+      } else if (wasGreen && isGreen) {
+        // Don't touch className - preserve green animation
+      } else if (isGreen && !wasGreen) {
+        // Becoming green - set class
+        charEl.className = `char untyped green`;
+      } else if (isGolden && !wasGolden) {
+        // Becoming golden - set class and fade duration
+        charEl.className = `char untyped golden`;
+        const fadeDuration = getFadeDuration();
+        charEl.style.setProperty('--golden-fade-duration', `${fadeDuration}ms`);
+      } else if (wasGolden && !isGolden) {
+        // No longer golden - remove golden styling
+        // In fever mode, all untyped letters are golden
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        const charNew = hasCharNew && !isGolden && !isGreen ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
+        if (!feverGolden) charEl.style.removeProperty('--golden-fade-duration');
+      } else if (wasGreen && !isGreen) {
+        // No longer green - remove green styling
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        const charNew = hasCharNew && !isGolden && !isGreen ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
+      } else {
+        // Normal update (not golden or green)
+        // In fever mode, all untyped letters are golden (preserve char-new for fade-in)
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        const charNew = hasCharNew ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
+      }
+
+      // Update cursor target
+      charEl.removeAttribute('data-cursor-target');
+      charEl.removeAttribute('data-cursor-end');
+
+      if (isCurrentWord && charIndex === state.currentCharIndex) {
+        charEl.setAttribute('data-cursor-target', 'true');
+      }
+
+      if (isCurrentWord && charIndex === state.currentCharIndex - 1 &&
+          state.currentCharIndex === typed.length && typed.length <= word.length) {
+        charEl.setAttribute('data-cursor-target', 'true');
+        charEl.setAttribute('data-cursor-end', 'true');
+        cursorAtEnd = true;
       }
     }
 
-    const isMistaken = state.mistaken[wordIndex] ?? false;
-    const wordClass = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
-    return `<span class="${wordClass}">${chars.join('')}</span>`;
-  });
+    // Handle extra characters (typed beyond word length)
+    const existingExtras = wordEl.querySelectorAll('.char.extra');
+    const extraCount = Math.max(0, typed.length - word.length);
 
-  wordsEl.innerHTML = wordElements.join(' ');
+    // Remove excess extras
+    for (let i = existingExtras.length - 1; i >= extraCount; i--) {
+      existingExtras[i]?.remove();
+    }
 
-  // Update progress indicator (shows completed words, not current)
-  renderProgress(state.currentWordIndex, state.words.length);
+    // Add/update extras
+    for (let i = 0; i < extraCount; i++) {
+      let extraEl = existingExtras[i] as HTMLElement | undefined;
+      const extraChar = typed[word.length + i] ?? '';
 
-  // Scroll first, then position cursor (so cursor reflects post-scroll position)
+      if (!extraEl) {
+        extraEl = document.createElement('span');
+        extraEl.className = 'char extra incorrect';
+        wordEl.appendChild(extraEl);
+      }
+
+      extraEl.textContent = extraChar;
+      extraEl.removeAttribute('data-cursor-target');
+      extraEl.removeAttribute('data-cursor-end');
+
+      const isLastExtra = i === extraCount - 1;
+      if (isCurrentWord && isLastExtra && state.currentCharIndex === typed.length) {
+        extraEl.setAttribute('data-cursor-target', 'true');
+        extraEl.setAttribute('data-cursor-end', 'true');
+        cursorAtEnd = true;
+      }
+    }
+
+    if (isNewWord) {
+      newCharOffset += word.length + 1;
+    }
+  }
+
+  // Update highest rendered index
+  highestRenderedIndex = Math.max(highestRenderedIndex, state.words.length - 1);
+
+  // Scroll and position cursor
   scrollToCurrentWord();
   updateCursorPosition(cursorAtEnd);
 }
@@ -162,6 +316,9 @@ export function resetScroll(): void {
   scrolledToLine = 0;
 }
 
+// Number of visible lines in viewport
+const VISIBLE_LINES = 3;
+
 function scrollToCurrentWord(): void {
   const wordsEl = document.getElementById('words');
   const currentWord = document.querySelector('.word.current') as HTMLElement | null;
@@ -176,11 +333,16 @@ function scrollToCurrentWord(): void {
   const wordTop = currentWord.offsetTop;
   const currentLine = Math.floor(wordTop / lineHeightPx);
 
-  // Keep current word always on line 2 (center)
-  // scrolledToLine + 1 = center line, so scrolledToLine = currentLine - 1
-  const targetScroll = Math.max(0, currentLine - 1);
-  if (targetScroll !== scrolledToLine) {
-    scrolledToLine = targetScroll;
+  // Scroll when cursor moves past the middle line
+  // This keeps upcoming text visible while maintaining context above
+  const middleLine = scrolledToLine + 1;
+
+  if (currentLine > middleLine) {
+    // Cursor went past middle - scroll so current line is the middle
+    scrolledToLine = currentLine - 1;
+  } else if (currentLine < scrolledToLine) {
+    // Cursor went above viewport (backspace) - scroll so current line is first visible
+    scrolledToLine = currentLine;
   }
 
   const offset = -scrolledToLine * lineHeightPx;
@@ -323,6 +485,41 @@ export function hideProgress(): void {
   progressEl.classList.remove('visible');
 }
 
+export function renderSolBar(sessionSol: number): void {
+  const solBarEl = document.getElementById('sol-bar');
+  if (!solBarEl) return;
+  solBarEl.innerHTML = `<span class="sol-icon">🌱</span><span class="sol-count">${sessionSol}</span>`;
+}
+
+export function hideSolBar(): void {
+  const solBarEl = document.getElementById('sol-bar');
+  if (!solBarEl) return;
+  solBarEl.classList.add('hidden');
+  solBarEl.classList.remove('pop');
+}
+
+export function popInSolBar(): void {
+  const solBarEl = document.getElementById('sol-bar');
+  if (!solBarEl) return;
+  solBarEl.classList.remove('hidden');
+  solBarEl.classList.add('pop');
+}
+
+// Legacy alias for backwards compatibility
+export function fadeInSolBar(): void {
+  popInSolBar();
+}
+
+// Keyboard shortcut for tutorial reset (Ctrl+Shift+Backspace)
+export function initTutorialResetShortcut(onReset: () => void): void {
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'Backspace') {
+      e.preventDefault();
+      onReset();
+    }
+  });
+}
+
 export function showFocusOverlay(): void {
   // Don't show if already visible
   if (document.querySelector('.focus-overlay')) return;
@@ -429,6 +626,148 @@ export function renderUpgradeChoice(
     }
   };
   document.addEventListener('keydown', keyHandler);
+
+  app.appendChild(modal);
+}
+
+export function renderTutorialStatsModal(
+  wpm: number,
+  accuracy: number,
+  maxChain: number,
+  elapsedMs: number,
+  totalSol: number,
+  onRedeem: () => void
+): void {
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+  const modal = document.createElement('div');
+  modal.className = 'tutorial-stats-modal';
+  modal.innerHTML = `
+    <div class="tutorial-stats-content">
+      <div class="tutorial-stats-grid">
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${wpm}</span>
+          <span class="tutorial-stat-label">wpm</span>
+        </div>
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${accuracy}%</span>
+          <span class="tutorial-stat-label">accuracy</span>
+        </div>
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${maxChain}x</span>
+          <span class="tutorial-stat-label">chain</span>
+        </div>
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${timeStr}</span>
+          <span class="tutorial-stat-label">time</span>
+        </div>
+      </div>
+      <p class="tutorial-redeem-prompt">press space to redeem ${totalSol} sol</p>
+    </div>
+  `;
+
+  // Space key handler
+  const keyHandler = (e: KeyboardEvent) => {
+    if (e.key === ' ') {
+      e.preventDefault();
+      document.removeEventListener('keydown', keyHandler);
+      modal.classList.add('fade-out');
+      setTimeout(() => {
+        modal.remove();
+        onRedeem();
+      }, 300);
+    }
+  };
+  document.addEventListener('keydown', keyHandler);
+
+  app.appendChild(modal);
+}
+
+// Fever mode body class for green theme
+export function setFeverMode(enabled: boolean): void {
+  if (enabled) {
+    document.body.classList.add('fever-mode');
+  } else {
+    document.body.classList.remove('fever-mode');
+  }
+}
+
+// Chain counter display
+export function renderChainCounter(chain: number): void {
+  let counter = document.getElementById('chain-counter');
+  if (!counter) {
+    counter = document.createElement('div');
+    counter.id = 'chain-counter';
+    counter.className = 'chain-counter';
+    document.getElementById('app')?.appendChild(counter);
+  }
+
+  counter.textContent = chain > 0 ? `${chain}x` : '';
+  counter.classList.toggle('visible', chain > 1);
+
+  // Trigger bump animation on increase
+  if (chain > 1) {
+    counter.classList.remove('bump');
+    // Force reflow to restart animation
+    void counter.offsetWidth;
+    counter.classList.add('bump');
+  }
+}
+
+export function hideChainCounter(): void {
+  const counter = document.getElementById('chain-counter');
+  if (counter) {
+    counter.classList.remove('visible');
+  }
+}
+
+// Screen glow effect on redemption
+export function triggerScreenGlow(): void {
+  const glow = document.createElement('div');
+  glow.className = 'screen-glow';
+  document.body.appendChild(glow);
+  setTimeout(() => glow.remove(), 800);
+}
+
+// QR code modal for sharing
+export function renderQRModal(url: string): void {
+  // Don't show if already visible
+  if (document.querySelector('.qr-modal')) return;
+
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+
+  const modal = document.createElement('div');
+  modal.className = 'qr-modal';
+  modal.innerHTML = `
+    <div class="qr-content">
+      <img src="${qrUrl}" alt="QR Code" class="qr-image" />
+      <p class="qr-url">${url}</p>
+      <p class="qr-url">reach me at russellpasetes.com</p>
+      <p class="qr-dismiss">press any key to dismiss</p>
+    </div>
+  `;
+
+  // Dismiss on any key
+  const keyHandler = (e: KeyboardEvent) => {
+    e.preventDefault();
+    document.removeEventListener('keydown', keyHandler);
+    modal.classList.add('fade-out');
+    setTimeout(() => modal.remove(), 300);
+  };
+
+  // Delay adding listener so the "?" keystroke doesn't immediately dismiss
+  setTimeout(() => {
+    document.addEventListener('keydown', keyHandler);
+  }, 100);
 
   app.appendChild(modal);
 }

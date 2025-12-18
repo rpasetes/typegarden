@@ -1,5 +1,9 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
+import { generateWords } from './words.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden, triggerFeverCapture } from './golden.ts';
+import { isGreenPosition, captureGreen } from './green.ts';
+import { getCurrentPhase, incrementChain, breakChain } from './tutorial.ts';
 
 export interface TypingState {
   words: string[];
@@ -17,12 +21,51 @@ export interface TypingState {
 }
 
 export type TypingCompleteCallback = (state: TypingState) => void;
+export type WordCompleteCallback = () => void;
+export type KeystrokeCallback = (correct: boolean) => void;
 
 let currentState: TypingState | null = null;
 let onCompleteCallback: TypingCompleteCallback | null = null;
+let onWordCompleteCallback: WordCompleteCallback | null = null;
+let onKeystrokeCallback: KeystrokeCallback | null = null;
+
+// Tutorial mode flag - when true, don't generate endless words
+let tutorialMode = false;
+
+// Remaining tutorial sentences to append progressively
+let remainingTutorialSentences: string[][] = [];
+
+// Append next sentence when this many words remaining
+const TUTORIAL_APPEND_THRESHOLD = 2;
+
+// Split words into sentences (by punctuation endings)
+function splitIntoSentences(words: string[]): string[][] {
+  const sentences: string[][] = [];
+  let currentSentence: string[] = [];
+
+  for (const word of words) {
+    currentSentence.push(word);
+    // End sentence on . ! ?
+    if (/[.!?]$/.test(word)) {
+      sentences.push(currentSentence);
+      currentSentence = [];
+    }
+  }
+
+  // Don't forget trailing words without punctuation
+  if (currentSentence.length > 0) {
+    sentences.push(currentSentence);
+  }
+
+  return sentences;
+}
 
 // Max gap between keystrokes before considered AFK (5 seconds)
 const AFK_THRESHOLD_MS = 5000;
+
+// Typing speed tracking (rolling window)
+const SPEED_WINDOW_SIZE = 15;
+const keystrokeTimestamps: number[] = [];
 
 export function createTypingState(words: string[]): TypingState {
   return {
@@ -41,6 +84,14 @@ export function createTypingState(words: string[]): TypingState {
   };
 }
 
+export function appendWords(newWords: string[]): void {
+  if (!currentState) return;
+
+  currentState.words.push(...newWords);
+  currentState.typed.push(...newWords.map(() => ''));
+  currentState.mistaken.push(...newWords.map(() => false));
+}
+
 export function calculateWPM(state: TypingState): number {
   if (!state.startTime) return 0;
   const endTime = state.endTime ?? Date.now();
@@ -54,6 +105,21 @@ export function calculateAccuracy(state: TypingState): number {
   const total = state.correctKeystrokes + state.incorrectKeystrokes;
   if (total === 0) return 100;
   return Math.round((state.correctKeystrokes / total) * 100);
+}
+
+export function getTypingSpeed(): number {
+  if (keystrokeTimestamps.length < 2) return 0;
+
+  const now = Date.now();
+  const recentStrokes = keystrokeTimestamps.filter(ts => now - ts < 5000);
+
+  if (recentStrokes.length < 2) return 0;
+
+  const timeSpan = now - recentStrokes[0]!;
+  if (timeSpan === 0) return 0;
+
+  const charsPerMs = recentStrokes.length / timeSpan;
+  return charsPerMs * 1000;
 }
 
 function trackActiveTime(): void {
@@ -119,10 +185,7 @@ function handleKeydown(e: KeyboardEvent): void {
   if (key.length === 1) {
     e.preventDefault();
     handleCharacter(key);
-    // Only render if run is still active (not completed)
-    if (currentState && !currentState.endTime) {
-      renderWords(currentState);
-    }
+    renderWords(currentState);
     return;
   }
 }
@@ -203,18 +266,46 @@ function handleSpace(): void {
 
   if (isIncomplete || hasErrors) {
     currentState.mistaken[wordIndex] = true;
-  }
-
-  // Check if we're at the last word
-  if (wordIndex >= currentState.words.length - 1) {
-    // Complete the run
-    completeRun();
-    return;
+    // Skipping with mistakes instantly expires any active golden
+    expireGolden();
+  } else if (!currentState.mistaken[wordIndex]) {
+    // Word completed correctly AND was never marked as mistaken - trigger callback
+    if (onWordCompleteCallback) {
+      onWordCompleteCallback();
+    }
   }
 
   // Advance to next word
   currentState.currentWordIndex++;
   currentState.currentCharIndex = 0;
+
+  // Check if golden letter was passed (skipped without capturing)
+  checkPassed(currentState.currentWordIndex, currentState.currentCharIndex, currentState.words);
+
+  // Check if we need more words
+  const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
+
+  if (tutorialMode) {
+    // Tutorial: append next sentence from remaining pool
+    if (wordsRemaining < TUTORIAL_APPEND_THRESHOLD && remainingTutorialSentences.length > 0) {
+      const nextSentence = remainingTutorialSentences.shift()!;
+      appendWords(nextSentence);
+    }
+
+    // Check if tutorial is complete (no more words and no sentences remaining)
+    if (currentState.currentWordIndex >= currentState.words.length && remainingTutorialSentences.length === 0) {
+      if (onCompleteCallback) {
+        onCompleteCallback(currentState);
+      }
+      return;
+    }
+  } else {
+    // Endless mode: generate random words
+    if (wordsRemaining < 10) {
+      const newWords = generateWords({ type: 'common', count: 15 });
+      appendWords(newWords);
+    }
+  }
 }
 
 function handleCharacter(char: string): void {
@@ -232,45 +323,124 @@ function handleCharacter(char: string): void {
 
   // Track keystrokes
   const expectedChar = currentWord[currentTyped.length];
+  const isFever = getCurrentPhase() === 'fever';
+
   if (char === expectedChar) {
     currentState.correctKeystrokes++;
+
+    // Track keystroke timing for speed calculation
+    keystrokeTimestamps.push(Date.now());
+    if (keystrokeTimestamps.length > SPEED_WINDOW_SIZE) {
+      keystrokeTimestamps.shift();
+    }
+
+    // In fever mode, every correct keystroke is a golden capture
+    if (isFever) {
+      triggerFeverCapture(wordIndex, currentTyped.length);
+      incrementChain();
+    }
+
+    // Notify keystroke callback (for fever stats)
+    if (onKeystrokeCallback) {
+      onKeystrokeCallback(true);
+    }
+
+    // Check for green letter capture (triggers fever or QR modal)
+    let greenCaptured = false;
+    if (isGreenPosition(wordIndex, currentTyped.length)) {
+      captureGreen();
+      greenCaptured = true;
+    }
+
+    // Check for golden letter capture (only on correct keystroke)
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      captureGolden();
+    }
+
+    // If green was captured, skip tutorial completion (green callback handles transition)
+    if (greenCaptured) {
+      return;
+    }
   } else {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
+    onTypo();
+
+    // Break chain in fever mode
+    if (isFever) {
+      breakChain();
+    }
+
+    // Notify keystroke callback (for fever stats)
+    if (onKeystrokeCallback) {
+      onKeystrokeCallback(false);
+    }
+
+    // Mistyping the golden letter itself loses the bonus entirely
+    if (isGoldenPosition(wordIndex, currentTyped.length)) {
+      expireGolden();
+    }
   }
 
-  // Auto-complete: if last word and typed length matches word length
-  const isLastWord = wordIndex === currentState.words.length - 1;
-  const newTypedLength = currentTyped.length + 1;
-  if (isLastWord && newTypedLength >= currentWord.length) {
-    completeRun();
+  // Notify golden system of character typed (for spawn timing)
+  onCharacterTyped(wordIndex, currentTyped.length, currentState.words);
+
+  // In tutorial mode, check if we just completed the final word
+  if (tutorialMode && char === expectedChar) {
+    const newTyped = currentState.typed[wordIndex] ?? '';
+    const isLastWord = wordIndex === currentState.words.length - 1;
+    const isWordComplete = newTyped.length === currentWord.length;
+
+    if (isLastWord && isWordComplete) {
+      // Final character of tutorial typed - trigger completion immediately
+      if (onWordCompleteCallback) {
+        onWordCompleteCallback();
+      }
+      if (onCompleteCallback) {
+        onCompleteCallback(currentState);
+      }
+    }
   }
 }
 
-function completeRun(): void {
-  if (!currentState) return;
-
-  currentState.endTime = Date.now();
-
-  // Remove keyboard listener
-  document.removeEventListener('keydown', handleKeydown);
-
-  // Trigger callback
-  if (onCompleteCallback) {
-    onCompleteCallback(currentState);
-  }
+export interface StartTypingOptions {
+  onWordComplete?: WordCompleteCallback;
+  onComplete?: TypingCompleteCallback;
+  onKeystroke?: KeystrokeCallback;
+  isTutorial?: boolean;
 }
 
 export function startTyping(
   words: string[],
-  onComplete?: TypingCompleteCallback
+  options: StartTypingOptions | WordCompleteCallback = {}
 ): TypingState {
   // Clean up previous listener if any
   document.removeEventListener('keydown', handleKeydown);
 
+  // Handle legacy signature (just callback)
+  const opts: StartTypingOptions = typeof options === 'function'
+    ? { onWordComplete: options }
+    : options;
+
+  tutorialMode = opts.isTutorial ?? false;
+
+  // For tutorial mode, chunk by sentences - start with first sentence, store rest
+  let initialWords = words;
+  remainingTutorialSentences = [];
+
+  if (tutorialMode) {
+    const sentences = splitIntoSentences(words);
+    if (sentences.length > 1) {
+      initialWords = sentences[0] ?? [];
+      remainingTutorialSentences = sentences.slice(1);
+    }
+  }
+
   // Create fresh state
-  currentState = createTypingState(words);
-  onCompleteCallback = onComplete ?? null;
+  currentState = createTypingState(initialWords);
+  onWordCompleteCallback = opts.onWordComplete ?? null;
+  onCompleteCallback = opts.onComplete ?? null;
+  onKeystrokeCallback = opts.onKeystroke ?? null;
 
   // Render initial state
   renderWords(currentState);

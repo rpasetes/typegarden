@@ -1,88 +1,334 @@
 import './style.css';
-import { startTyping, calculateWPM, calculateAccuracy } from './typing.ts';
-import type { TypingState } from './typing.ts';
-import { loadGarden, initGarden, saveGarden, addRun } from './garden.ts';
+import { startTyping } from './typing.ts';
+import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderStats, renderContinuePrompt, clearStats, hideProgress, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeOutWords, fadeOutStats, fadeInWords, prepareWordsFadeIn } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow, renderQRModal } from './ui.ts';
 import { generateWords } from './words.ts';
+import { initSol, earnBaseSol, earnGoldenSol, earnBonusSol, setOnSolChange, getSolState } from './sol.ts';
+import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
+import { getTypingState } from './typing.ts';
+import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
+import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
+import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
+
+// Calculate performance bonus multiplier
+function calculatePerformanceBonus(wpm: number, accuracy: number, maxChain: number): number {
+  // WPM bonus: 0-50% (60 WPM = 25%, 120+ WPM = 50%)
+  const wpmBonus = Math.min(0.5, wpm / 240);
+
+  // Accuracy bonus: 0-50% (100% = 50%, 90% = 25%, <80% = 0%)
+  const accuracyBonus = accuracy >= 80 ? (accuracy - 80) * 0.025 : 0;
+
+  // Chain bonus: 0-100% (10 = ~33%, 30+ = 100%)
+  const chainBonus = Math.min(1, maxChain / 30);
+
+  return 1 + wpmBonus + accuracyBonus + chainBonus;
+}
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
-let waitingForContinue = false;
-let sessionTotalTime = 0;
 let isRunActive = false;
 
-async function onRunComplete(state: TypingState): Promise<void> {
-  const wpm = calculateWPM(state);
-  const accuracy = calculateAccuracy(state);
-  const wordCount = state.words.length;
-  const duration = (state.endTime ?? Date.now()) - (state.startTime ?? Date.now());
+// Initialize sol state
+initSol(garden);
 
-  // Mark run as inactive
-  isRunActive = false;
-
-  // Accumulate only active typing time (excludes AFK)
-  sessionTotalTime += state.activeTime;
-
-  // Hide progress
-  hideProgress();
-
-  // Fade out words before showing stats
-  await fadeOutWords();
-
-  // Show final stats above typing area
-  renderStats(wpm, accuracy, duration, state.activeTime, sessionTotalTime);
-
-  // Save run to garden
-  garden = addRun(garden, {
-    timestamp: Date.now(),
-    wpm,
-    accuracy,
-    wordCount,
-    duration,
-    correctKeystrokes: state.correctKeystrokes,
-    incorrectKeystrokes: state.incorrectKeystrokes,
-  });
+// Set up sol change listener to update UI
+setOnSolChange((solState) => {
+  renderSolBar(solState.sessionSol);
+  // Update garden with sol state
+  garden = { ...garden, sessionSol: solState.sessionSol, lifetimeSol: solState.lifetimeSol };
   saveGarden(garden);
+});
 
-  // Show continue prompt and wait for space
-  renderContinuePrompt();
-  waitingForContinue = true;
+// Set up golden letter capture callback
+setOnGoldenCapture((reward, wordIndex, charIndex) => {
+  // Spawn particles from the captured letter's position (scaled by reward)
+  const pos = getCharacterPosition(wordIndex, charIndex);
+  if (pos) {
+    spawnGoldenParticles(pos.x, pos.y, reward as 1 | 2 | 3);
+  }
+
+  // Show floating reward text
+  spawnRewardText(reward);
+
+  // Earn the sol reward
+  earnGoldenSol(reward as 1 | 2 | 3);
+
+  // Track golden captures during fever for stats
+  if (getCurrentPhase() === 'fever') {
+    trackFeverGoldenCapture();
+  }
+});
+
+// Set up golden letter expiry callback to trigger re-render
+setOnGoldenExpiry(() => {
+  const state = getTypingState();
+  if (state) renderWords(state);
+});
+
+// Track if green has been captured to prevent duplicate phase advance
+let greenCaptured = false;
+
+// Set up green letter capture callback (triggers fever mode or QR modal)
+setOnGreenCapture(() => {
+  // Green captured during mechanics phase - transition to fever
+  if (getCurrentPhase() === 'mechanics' && !greenCaptured) {
+    greenCaptured = true;
+    fadeOutWords().then(() => {
+      advancePhase(); // moves to 'fever'
+      startTutorialPhase('fever');
+    });
+  }
+  // Green captured in endless mode (after tutorial) - show QR modal
+  if (getCurrentPhase() === null && garden.tutorialComplete) {
+    renderQRModal('https://typegarden.vercel.app');
+  }
+});
+
+function onWordComplete(): void {
+  earnBaseSol();
 }
 
-async function handleContinue(e: KeyboardEvent): Promise<void> {
-  // Hide overlay on any keypress
-  hideFocusOverlay();
+// Tutorial phase handling
+function startTutorialPhase(phase: TutorialPhase): void {
+  if (!phase) return;
 
-  if (!waitingForContinue) return;
-  if (e.key !== ' ') return;
+  // Reset green capture flag at start of tutorial
+  if (phase === 'intro') {
+    greenCaptured = false;
+  }
 
-  e.preventDefault();
-  waitingForContinue = false;
+  const config = getTutorialConfig(phase);
 
-  // Fade out stats before starting new run
-  await fadeOutStats();
-  clearStats();
-  startNewRun();
-}
+  // Configure golden system
+  setGoldenEnabled(config.goldenEnabled);
+  setSpawnInterval(config.goldenSpawnInterval);
 
-function startNewRun(): void {
+  // Configure fever mode styling and all-green letters
+  const isFever = phase === 'fever';
+  setFeverMode(isFever);
+  setAllLettersGreen(config.allLettersGreen);
+
+  // Hide chain counter when not in fever
+  if (!isFever) {
+    hideChainCounter();
+  }
+
+  // Configure green letter if specified
+  resetGreen();
+  if (config.greenLetterPosition) {
+    setGreenLetterPosition(
+      config.greenLetterPosition.wordIndex,
+      config.greenLetterPosition.charIndex
+    );
+  }
+
   // Render fresh UI
   render(garden);
   resetScroll();
+  resetGolden();
+
+  // Set golden start word index (after resetGolden which clears it)
+  setGoldenStartWordIndex(config.goldenStartWordIndex);
+
+  // Hide sol bar for intro phase
+  if (!config.solBarVisible) {
+    hideSolBar();
+  }
 
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();
 
-  // Generate words — for now, 50 common words
-  // TODO: Tutorial flow will replace this
-  const words = generateWords({ type: 'common', count: 50 });
+  // Mark run as active
+  isRunActive = true;
+
+  // Start typing with tutorial options
+  startTyping(config.words, {
+    onWordComplete: () => {
+      // Only earn sol starting from mechanics phase (not intro)
+      if (phase !== 'intro') {
+        earnBaseSol();
+      }
+    },
+    onComplete: () => {
+      // Phase completed - advance to next
+      handleTutorialPhaseComplete();
+    },
+    onKeystroke: (correct) => {
+      // Start tutorial timer on first keystroke
+      startTutorialTimer();
+
+      // Track keystrokes during fever for stats
+      if (getCurrentPhase() === 'fever') {
+        trackFeverKeystroke(correct);
+        // Update chain counter in real-time
+        renderChainCounter(getCurrentChain());
+      }
+    },
+    isTutorial: true,
+  });
+
+  // Initial sol bar render (will be hidden if intro phase)
+  renderSolBar(getSolState().sessionSol);
+
+  // Double RAF to ensure browser applies initial fade-out class before removing it
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fadeInWords();
+    });
+  });
+}
+
+function handleTutorialPhaseComplete(): void {
+  const currentPhase = getCurrentPhase();
+
+  if (currentPhase === 'intro') {
+    // Sequence: fade out words → pop sol bar → wait → fade in mechanics
+    fadeOutWords().then(() => {
+      popInSolBar();
+      // Wait for sol bar animation to complete (500ms) before showing next prompt
+      setTimeout(() => {
+        advancePhase();
+        startTutorialPhase('mechanics');
+      }, 600);
+    });
+  } else if (currentPhase === 'mechanics') {
+    // Mechanics completes when green letter is captured (handled by green callback)
+    // But if they finish typing without capturing green, still advance
+    if (!greenCaptured) {
+      fadeOutWords().then(() => {
+        advancePhase();
+        startTutorialPhase('fever');
+      });
+    }
+  } else if (currentPhase === 'fever') {
+    // Fever complete - show stats modal
+    advancePhase(); // moves to 'stats'
+
+    // Turn off fever mode styling
+    setFeverMode(false);
+    setAllLettersGreen(false);
+    hideChainCounter();
+
+    const feverStats = getFeverStats();
+    const wpm = feverStats ? Math.round((feverStats.correctKeystrokes / 5) / ((Date.now() - feverStats.startTime) / 60000)) : 0;
+    const totalKeystrokes = feverStats ? feverStats.correctKeystrokes + feverStats.incorrectKeystrokes : 0;
+    const accuracy = feverStats && totalKeystrokes > 0 ? Math.round((feverStats.correctKeystrokes / totalKeystrokes) * 100) : 100;
+    const maxChain = getMaxChain();
+    const elapsedTime = getTutorialElapsedTime();
+
+    // Calculate total sol with performance bonus
+    const baseSol = getSolState().sessionSol;
+    const bonusMultiplier = calculatePerformanceBonus(wpm, accuracy, maxChain);
+    const totalSol = Math.floor(baseSol * bonusMultiplier);
+
+    renderTutorialStatsModal(wpm, accuracy, maxChain, elapsedTime, totalSol, () => {
+      // Apply bonus sol
+      const bonusSol = totalSol - baseSol;
+      if (bonusSol > 0) {
+        earnBonusSol(bonusSol);
+      }
+
+      // Yellow screen glow on redemption
+      triggerScreenGlow();
+
+      // Sol burst celebration (with slight delay for glow to start)
+      setTimeout(() => {
+        triggerSolBurstCelebration();
+      }, 150);
+
+      // Mark tutorial complete
+      garden = { ...garden, tutorialComplete: true };
+      saveGarden(garden);
+
+      // Start endless mode with "enjoy"
+      advancePhase(); // moves to null
+      startEndlessWithEnjoy();
+    });
+  }
+}
+
+function triggerSolBurstCelebration(): void {
+  const centerX = window.innerWidth / 2;
+  const centerY = window.innerHeight / 2;
+  const solAmount = getSolState().sessionSol;
+
+  // Multiple wave bursts
+  spawnCelebrationParticles(centerX, centerY, solAmount);
+  setTimeout(() => spawnCelebrationParticles(centerX, centerY, Math.floor(solAmount * 0.7)), 150);
+  setTimeout(() => spawnCelebrationParticles(centerX, centerY, Math.floor(solAmount * 0.5)), 300);
+}
+
+function startEndlessWithEnjoy(): void {
+  // Reset golden to normal behavior
+  setGoldenEnabled(true);
+  resetSpawnInterval();
+
+  // Render fresh UI
+  render(garden);
+  resetScroll();
+  resetGolden();
+  resetGreen();
+
+  // Set green letter at "?" in "time?" (word index 9, char index 4)
+  setGreenLetterPosition(9, 4);
+
+  // Prepare words element for fade-in transition
+  prepareWordsFadeIn();
+
+  // Generate words starting with challenge prompt + easter egg
+  const additionalWords = generateWords({ type: 'common', count: 30 });
+  const words = [
+    'thanks', 'and', 'enjoy,', 'think', 'you', 'can', 'beat', 'my', 'demo', 'time?',
+    'control', 'shift', 'backspace', 'resets', 'to', 'tutorial',
+    ...additionalWords,
+  ];
 
   // Mark run as active
   isRunActive = true;
 
-  // Start typing session (this calls renderWords)
-  startTyping(words, onRunComplete);
+  // Start typing session with word complete callback
+  startTyping(words, onWordComplete);
+
+  // Render sol bar
+  renderSolBar(getSolState().sessionSol);
+
+  // Double RAF to ensure browser applies initial fade-out class before removing it
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fadeInWords();
+    });
+  });
+}
+
+function startTypingSession(): void {
+  // Check if tutorial should be shown
+  if (shouldShowTutorial(garden)) {
+    startTutorial();
+    startTutorialPhase('intro');
+    return;
+  }
+
+  // Regular endless mode
+  // Render fresh UI
+  render(garden);
+  resetScroll();
+  resetGolden();
+
+  // Prepare words element for fade-in transition
+  prepareWordsFadeIn();
+
+  // Generate initial words
+  const words = generateWords({ type: 'common', count: 40 });
+
+  // Mark run as active
+  isRunActive = true;
+
+  // Start typing session with word complete callback
+  startTyping(words, onWordComplete);
+
+  // Initial sol bar render
+  renderSolBar(getSolState().sessionSol);
 
   // Double RAF to ensure browser applies initial fade-out class before removing it
   requestAnimationFrame(() => {
@@ -96,13 +342,25 @@ export function getIsRunActive(): boolean {
   return isRunActive;
 }
 
+// Overlay handler to hide on any keypress
+function handleKeyPress(): void {
+  hideFocusOverlay();
+}
+
 // Initial render and start
 render(garden);
 initCursorIdleDetection();
-document.addEventListener('keydown', handleContinue);
+document.addEventListener('keydown', handleKeyPress);
+
+// Ctrl+Shift+Backspace resets tutorial progress
+initTutorialResetShortcut(() => {
+  garden = { ...initGarden(), sessionSol: 0, lifetimeSol: 0 };
+  saveGarden(garden);
+  window.location.reload();
+});
 
 // Focus overlay - show only on blur, not on load
 window.addEventListener('blur', showFocusOverlay);
 window.addEventListener('focus', hideFocusOverlay);
 
-startNewRun();
+startTypingSession();
