@@ -345,16 +345,21 @@ function handleCharacter(char: string): void {
       onKeystrokeCallback(true);
     }
 
-    // Check for green letter capture (triggers fever)
+    // Check for green letter capture (triggers fever or QR modal)
+    let greenCaptured = false;
     if (isGreenPosition(wordIndex, currentTyped.length)) {
       captureGreen();
-      // Return early - green capture handles phase transition, don't trigger completion
-      return;
+      greenCaptured = true;
     }
 
     // Check for golden letter capture (only on correct keystroke)
     if (isGoldenPosition(wordIndex, currentTyped.length)) {
       captureGolden();
+    }
+
+    // If green was captured, skip tutorial completion (green callback handles transition)
+    if (greenCaptured) {
+      return;
     }
   } else {
     currentState.incorrectKeystrokes++;
