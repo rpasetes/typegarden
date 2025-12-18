@@ -3,7 +3,7 @@ import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
 import { getActiveGolden, getFadeDuration } from './golden.ts';
-import { isGreenPosition } from './green.ts';
+import { isGreenPosition, getActiveGreen } from './green.ts';
 
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
@@ -73,7 +73,11 @@ export function render(garden: GardenState): void {
 }
 
 // Only animate words within this range of current position
-const ANIMATE_AHEAD = 30;
+const ANIMATE_AHEAD = 25;
+
+// Only update character states within this window (performance optimization)
+const UPDATE_WINDOW_BEHIND = 1;
+const UPDATE_WINDOW_AHEAD = 5;
 
 export function renderWords(state: TypingState): void {
   const wordsEl = document.getElementById('words');
@@ -89,8 +93,9 @@ export function renderWords(state: TypingState): void {
   // Track char offset for new word animations
   let newCharOffset = 0;
 
-  // Get active golden letter once outside the loop
+  // Get active golden/green letters once outside the loop
   const activeGolden = getActiveGolden();
+  const activeGreen = getActiveGreen();
 
   for (let wordIndex = 0; wordIndex < state.words.length; wordIndex++) {
     const word = state.words[wordIndex] ?? '';
@@ -141,6 +146,18 @@ export function renderWords(state: TypingState): void {
     // Update word classes
     wordEl.className = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
 
+    // Skip character state updates for words outside the update window (performance)
+    const inUpdateWindow = wordIndex >= state.currentWordIndex - UPDATE_WINDOW_BEHIND &&
+                           wordIndex <= state.currentWordIndex + UPDATE_WINDOW_AHEAD;
+    // Always update words containing golden or green letters
+    const hasGolden = activeGolden && activeGolden.wordIndex === wordIndex;
+    const hasGreen = activeGreen && activeGreen.wordIndex === wordIndex;
+
+    if (!inUpdateWindow && !hasGolden && !hasGreen) {
+      if (isNewWord) newCharOffset += word.length + 1;
+      continue;
+    }
+
     // Update character states
     const charEls = wordEl.querySelectorAll('.char:not(.extra)');
     for (let charIndex = 0; charIndex < word.length; charIndex++) {
@@ -154,7 +171,8 @@ export function renderWords(state: TypingState): void {
         activeGolden.wordIndex === wordIndex &&
         activeGolden.charIndex === charIndex &&
         !isTyped;
-      const isGreen = isGreenPosition(wordIndex, charIndex) && !isTyped;
+      // Only show green letter after fade-in animation completes
+      const isGreen = inUpdateWindow && !isAnimating && isGreenPosition(wordIndex, charIndex) && !isTyped;
 
       // Update typing state classes
       const hasCharNew = charEl.classList.contains('char-new') && !isGolden && !isGreen;
