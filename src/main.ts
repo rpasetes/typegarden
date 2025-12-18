@@ -105,13 +105,12 @@ function startTutorialPhase(phase: TutorialPhase): void {
   // Start typing with tutorial options
   startTyping(config.words, {
     onWordComplete: () => {
-      earnBaseSol();
+      // Only earn sol starting from mechanics phase (not intro)
+      if (phase !== 'intro') {
+        earnBaseSol();
+      }
     },
     onComplete: () => {
-      // Pop in sol bar at end of intro (typing the final period)
-      if (phase === 'intro') {
-        popInSolBar();
-      }
       // Phase completed - advance to next
       handleTutorialPhaseComplete();
     },
@@ -139,10 +138,14 @@ function handleTutorialPhaseComplete(): void {
   const currentPhase = getCurrentPhase();
 
   if (currentPhase === 'intro') {
-    // Fade out intro, advance to mechanics
+    // Sequence: fade out words → pop sol bar → wait → fade in mechanics
     fadeOutWords().then(() => {
-      advancePhase();
-      startTutorialPhase('mechanics');
+      popInSolBar();
+      // Wait for sol bar animation to complete (500ms) before showing next prompt
+      setTimeout(() => {
+        advancePhase();
+        startTutorialPhase('mechanics');
+      }, 600);
     });
   } else if (currentPhase === 'mechanics') {
     // Mechanics completes when green letter is captured (handled by green callback)
