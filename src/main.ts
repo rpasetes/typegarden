@@ -75,6 +75,11 @@ function onWordComplete(): void {
 function startTutorialPhase(phase: TutorialPhase): void {
   if (!phase) return;
 
+  // Reset green capture flag at start of tutorial
+  if (phase === 'intro') {
+    greenCaptured = false;
+  }
+
   const config = getTutorialConfig(phase);
 
   // Configure golden system
