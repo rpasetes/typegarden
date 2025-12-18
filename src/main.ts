@@ -276,9 +276,13 @@ function startEndlessWithEnjoy(): void {
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();
 
-  // Generate words starting with challenge prompt
+  // Generate words starting with challenge prompt + easter egg
   const additionalWords = generateWords({ type: 'common', count: 30 });
-  const words = ['thanks', 'and', 'enjoy,', 'think', 'you', 'can', 'beat', 'my', 'demo', 'time?', ...additionalWords];
+  const words = [
+    'thanks', 'and', 'enjoy,', 'think', 'you', 'can', 'beat', 'my', 'demo', 'time?',
+    'control', 'shift', 'backspace', 'resets', 'to', 'tutorial',
+    ...additionalWords,
+  ];
 
   // Mark run as active
   isRunActive = true;
