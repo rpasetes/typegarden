@@ -2,7 +2,7 @@ import './style.css';
 import { startTyping } from './typing.ts';
 import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initSolBarReset } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut } from './ui.ts';
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval } from './golden.ts';
@@ -271,8 +271,8 @@ render(garden);
 initCursorIdleDetection();
 document.addEventListener('keydown', handleKeyPress);
 
-// Triple-click on sol bar resets tutorial progress
-initSolBarReset(() => {
+// Ctrl+Shift+Backspace resets tutorial progress
+initTutorialResetShortcut(() => {
   garden = { ...initGarden(), sessionSol: 0, lifetimeSol: 0 };
   saveGarden(garden);
   window.location.reload();

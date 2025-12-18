@@ -477,31 +477,12 @@ export function fadeInSolBar(): void {
   popInSolBar();
 }
 
-// Triple-click detection state
-let solBarClickCount = 0;
-let solBarClickTimer: ReturnType<typeof setTimeout> | null = null;
-const TRIPLE_CLICK_TIMEOUT = 400;
-
-export function initSolBarReset(onReset: () => void): void {
-  const solBarEl = document.getElementById('sol-bar');
-  if (!solBarEl) return;
-
-  solBarEl.addEventListener('click', () => {
-    solBarClickCount++;
-
-    if (solBarClickTimer) {
-      clearTimeout(solBarClickTimer);
-    }
-
-    if (solBarClickCount >= 3) {
-      // Triple click detected - reset tutorial
-      solBarClickCount = 0;
+// Keyboard shortcut for tutorial reset (Ctrl+Shift+Backspace)
+export function initTutorialResetShortcut(onReset: () => void): void {
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'Backspace') {
+      e.preventDefault();
       onReset();
-    } else {
-      // Reset count after timeout
-      solBarClickTimer = setTimeout(() => {
-        solBarClickCount = 0;
-      }, TRIPLE_CLICK_TIMEOUT);
     }
   });
 }
