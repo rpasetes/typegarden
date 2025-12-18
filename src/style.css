@@ -126,6 +126,24 @@ body {
   100% { opacity: 0.3; }
 }
 
+/* Green (rare) letter - persistent pulse, no fade */
+.char.green {
+  color: #b8bb26;
+  animation: green-pulse 1s ease-in-out infinite;
+  text-shadow: 0 0 8px #b8bb26;
+}
+
+@keyframes green-pulse {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 8px #b8bb26;
+  }
+  50% {
+    opacity: 0.8;
+    text-shadow: 0 0 16px #b8bb26, 0 0 24px #b8bb26;
+  }
+}
+
 /* Cursor — height anchored to font size via em */
 .cursor {
   position: absolute;
@@ -345,6 +363,33 @@ body {
   color: var(--accent);
 }
 
+/* Sol bar hidden state (for tutorial intro) */
+.sol-bar.hidden {
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+}
+
+/* Sol bar pop animation */
+.sol-bar.pop {
+  animation: sol-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes sol-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Golden Particles */
 .golden-particle {
   position: fixed;
@@ -408,6 +453,94 @@ body {
   }
   100% {
     transform: translate(var(--target-x), var(--target-y)) scale(0.5);
+    opacity: 0;
+  }
+}
+
+/* Tutorial Stats Modal */
+.tutorial-stats-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 40, 40, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.5s ease;
+}
+
+.tutorial-stats-modal.fade-out {
+  animation: fadeOut 0.3s ease forwards;
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; }
+}
+
+.tutorial-stats-content {
+  text-align: center;
+}
+
+.tutorial-stats-grid {
+  display: flex;
+  gap: 3rem;
+  margin-bottom: 2rem;
+}
+
+.tutorial-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tutorial-stat-value {
+  font-size: 3rem;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.tutorial-stat-label {
+  font-size: 0.875rem;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.tutorial-redeem-prompt {
+  color: var(--text-dim);
+  font-size: 1rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Celebration Particles */
+.celebration-particle {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 0 15px var(--accent), 0 0 30px var(--accent);
+  animation: celebration-flight 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes celebration-flight {
+  0% {
+    transform: translate(0, 0) scale(0);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(var(--burst-x), var(--burst-y)) scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--target-x), var(--target-y)) scale(0.3);
     opacity: 0;
   }
 }

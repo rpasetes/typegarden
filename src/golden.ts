@@ -15,10 +15,16 @@ export interface GoldenLetter {
 let activeGolden: GoldenLetter | null = null;
 
 // Spawn configuration
-const SPAWN_INTERVAL = 20;        // Spawn every ~20 characters typed
-const MIN_DISTANCE = 3;           // Minimum chars ahead
-const MAX_DISTANCE = 15;          // Maximum chars ahead
-const MISTAKE_COOLDOWN_MS = 2000; // Can't spawn for 2s after a mistake
+const DEFAULT_SPAWN_INTERVAL = 20; // Spawn every ~20 characters typed
+const MIN_DISTANCE = 3;            // Minimum chars ahead
+const MAX_DISTANCE = 15;           // Maximum chars ahead
+const MISTAKE_COOLDOWN_MS = 2000;  // Can't spawn for 2s after a mistake
+
+// Configurable spawn interval (for fever mode 2x density)
+let spawnInterval = DEFAULT_SPAWN_INTERVAL;
+
+// Enable/disable golden spawning (for tutorial phases)
+let goldenEnabled = true;
 
 // Track characters typed since last spawn
 let charsSinceSpawn = 0;
@@ -41,6 +47,18 @@ export function setOnGoldenCapture(callback: (reward: number, wordIndex: number,
 
 export function setOnGoldenExpiry(callback: () => void): void {
   onExpiryCallback = callback;
+}
+
+export function setGoldenEnabled(enabled: boolean): void {
+  goldenEnabled = enabled;
+}
+
+export function setSpawnInterval(interval: number): void {
+  spawnInterval = interval;
+}
+
+export function resetSpawnInterval(): void {
+  spawnInterval = DEFAULT_SPAWN_INTERVAL;
 }
 
 export function resetGolden(): void {
@@ -136,11 +154,14 @@ export function onCharacterTyped(
   currentCharIndex: number,
   words: string[]
 ): void {
+  // Skip if golden spawning is disabled (tutorial intro phase)
+  if (!goldenEnabled) return;
+
   charsSinceSpawn++;
 
   // Check for spawn (skip if in cooldown from recent mistake)
   const inCooldown = Date.now() - lastMistakeAt < MISTAKE_COOLDOWN_MS;
-  if (!activeGolden && charsSinceSpawn >= SPAWN_INTERVAL && !inCooldown) {
+  if (!activeGolden && charsSinceSpawn >= spawnInterval && !inCooldown) {
     spawnGolden(currentWordIndex, currentCharIndex, words);
     charsSinceSpawn = 0;
   }

@@ -129,3 +129,37 @@ export function getCharacterPosition(wordIndex: number, charIndex: number): { x:
     y: rect.top + rect.height / 2,
   };
 }
+
+// Celebration particle burst for sol redemption
+export function spawnCelebrationParticles(x: number, y: number, intensity: number): void {
+  const container = document.getElementById('app');
+  if (!container) return;
+
+  const target = getTargetPosition();
+  const particleCount = Math.min(30, Math.max(10, intensity * 2));
+
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'celebration-particle';
+
+    // Random burst direction in full circle
+    const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
+    const burstDistance = 80 + Math.random() * 60;
+    const burstX = Math.cos(angle) * burstDistance;
+    const burstY = Math.sin(angle) * burstDistance;
+
+    // Set position and animation variables
+    particle.style.left = `${x}px`;
+    particle.style.top = `${y}px`;
+    particle.style.setProperty('--burst-x', `${burstX}px`);
+    particle.style.setProperty('--burst-y', `${burstY}px`);
+    particle.style.setProperty('--target-x', `${target.x - x}px`);
+    particle.style.setProperty('--target-y', `${target.y - y}px`);
+    particle.style.animationDelay = `${i * 20}ms`;
+
+    container.appendChild(particle);
+
+    // Cleanup after animation
+    setTimeout(() => particle.remove(), 1500);
+  }
+}

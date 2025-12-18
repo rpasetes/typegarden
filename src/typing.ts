@@ -2,6 +2,7 @@ import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
 import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden } from './golden.ts';
+import { isGreenPosition, captureGreen } from './green.ts';
 
 export interface TypingState {
   words: string[];
@@ -20,10 +21,15 @@ export interface TypingState {
 
 export type TypingCompleteCallback = (state: TypingState) => void;
 export type WordCompleteCallback = () => void;
+export type KeystrokeCallback = (correct: boolean) => void;
 
 let currentState: TypingState | null = null;
 let onCompleteCallback: TypingCompleteCallback | null = null;
 let onWordCompleteCallback: WordCompleteCallback | null = null;
+let onKeystrokeCallback: KeystrokeCallback | null = null;
+
+// Tutorial mode flag - when true, don't generate endless words
+let tutorialMode = false;
 
 // Max gap between keystrokes before considered AFK (5 seconds)
 const AFK_THRESHOLD_MS = 5000;
@@ -247,11 +253,21 @@ function handleSpace(): void {
   // Check if golden letter was passed (skipped without capturing)
   checkPassed(currentState.currentWordIndex, currentState.currentCharIndex, currentState.words);
 
-  // Check if we need more words (endless mode)
-  const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
-  if (wordsRemaining < 10) {
-    const newWords = generateWords({ type: 'common', count: 15 });
-    appendWords(newWords);
+  // Check if tutorial is complete (no more words)
+  if (tutorialMode && currentState.currentWordIndex >= currentState.words.length) {
+    if (onCompleteCallback) {
+      onCompleteCallback(currentState);
+    }
+    return;
+  }
+
+  // Check if we need more words (endless mode only)
+  if (!tutorialMode) {
+    const wordsRemaining = currentState.words.length - currentState.currentWordIndex;
+    if (wordsRemaining < 10) {
+      const newWords = generateWords({ type: 'common', count: 15 });
+      appendWords(newWords);
+    }
   }
 }
 
@@ -279,6 +295,16 @@ function handleCharacter(char: string): void {
       keystrokeTimestamps.shift();
     }
 
+    // Notify keystroke callback (for fever stats)
+    if (onKeystrokeCallback) {
+      onKeystrokeCallback(true);
+    }
+
+    // Check for green letter capture (triggers fever)
+    if (isGreenPosition(wordIndex, currentTyped.length)) {
+      captureGreen();
+    }
+
     // Check for golden letter capture (only on correct keystroke)
     if (isGoldenPosition(wordIndex, currentTyped.length)) {
       captureGolden();
@@ -287,6 +313,11 @@ function handleCharacter(char: string): void {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
     onTypo();
+
+    // Notify keystroke callback (for fever stats)
+    if (onKeystrokeCallback) {
+      onKeystrokeCallback(false);
+    }
 
     // Mistyping the golden letter itself loses the bonus entirely
     if (isGoldenPosition(wordIndex, currentTyped.length)) {
@@ -297,19 +328,49 @@ function handleCharacter(char: string): void {
   // Notify golden system of character typed (for spawn timing)
   onCharacterTyped(wordIndex, currentTyped.length, currentState.words);
 
-  // No auto-complete in endless mode - user must press space to advance
+  // In tutorial mode, check if we just completed the final word
+  if (tutorialMode && char === expectedChar) {
+    const newTyped = currentState.typed[wordIndex] ?? '';
+    const isLastWord = wordIndex === currentState.words.length - 1;
+    const isWordComplete = newTyped.length === currentWord.length;
+
+    if (isLastWord && isWordComplete) {
+      // Final character of tutorial typed - trigger completion immediately
+      if (onWordCompleteCallback) {
+        onWordCompleteCallback();
+      }
+      if (onCompleteCallback) {
+        onCompleteCallback(currentState);
+      }
+    }
+  }
+}
+
+export interface StartTypingOptions {
+  onWordComplete?: WordCompleteCallback;
+  onComplete?: TypingCompleteCallback;
+  onKeystroke?: KeystrokeCallback;
+  isTutorial?: boolean;
 }
 
 export function startTyping(
   words: string[],
-  onWordComplete?: WordCompleteCallback
+  options: StartTypingOptions | WordCompleteCallback = {}
 ): TypingState {
   // Clean up previous listener if any
   document.removeEventListener('keydown', handleKeydown);
 
+  // Handle legacy signature (just callback)
+  const opts: StartTypingOptions = typeof options === 'function'
+    ? { onWordComplete: options }
+    : options;
+
   // Create fresh state
   currentState = createTypingState(words);
-  onWordCompleteCallback = onWordComplete ?? null;
+  onWordCompleteCallback = opts.onWordComplete ?? null;
+  onCompleteCallback = opts.onComplete ?? null;
+  onKeystrokeCallback = opts.onKeystroke ?? null;
+  tutorialMode = opts.isTutorial ?? false;
 
   // Render initial state
   renderWords(currentState);
