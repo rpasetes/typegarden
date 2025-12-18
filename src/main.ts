@@ -8,7 +8,7 @@ import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
-import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, type TutorialPhase } from './tutorial.ts';
+import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
 import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
@@ -137,6 +137,9 @@ function startTutorialPhase(phase: TutorialPhase): void {
       handleTutorialPhaseComplete();
     },
     onKeystroke: (correct) => {
+      // Start tutorial timer on first keystroke
+      startTutorialTimer();
+
       // Track keystrokes during fever for stats
       if (getCurrentPhase() === 'fever') {
         trackFeverKeystroke(correct);
@@ -193,10 +196,10 @@ function handleTutorialPhaseComplete(): void {
     const wpm = feverStats ? Math.round((feverStats.correctKeystrokes / 5) / ((Date.now() - feverStats.startTime) / 60000)) : 0;
     const totalKeystrokes = feverStats ? feverStats.correctKeystrokes + feverStats.incorrectKeystrokes : 0;
     const accuracy = feverStats && totalKeystrokes > 0 ? Math.round((feverStats.correctKeystrokes / totalKeystrokes) * 100) : 100;
-    const goldenCaptures = feverStats?.goldenCaptures ?? 0;
     const maxChain = getMaxChain();
+    const elapsedTime = getTutorialElapsedTime();
 
-    renderTutorialStatsModal(wpm, accuracy, maxChain, () => {
+    renderTutorialStatsModal(wpm, accuracy, maxChain, elapsedTime, () => {
       // Yellow screen glow on redemption
       triggerScreenGlow();
 

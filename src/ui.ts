@@ -631,10 +631,16 @@ export function renderTutorialStatsModal(
   wpm: number,
   accuracy: number,
   maxChain: number,
+  elapsedMs: number,
   onRedeem: () => void
 ): void {
   const app = document.getElementById('app');
   if (!app) return;
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
   const modal = document.createElement('div');
   modal.className = 'tutorial-stats-modal';
@@ -652,6 +658,10 @@ export function renderTutorialStatsModal(
         <div class="tutorial-stat-item">
           <span class="tutorial-stat-value">${maxChain}x</span>
           <span class="tutorial-stat-label">chain</span>
+        </div>
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${timeStr}</span>
+          <span class="tutorial-stat-label">time</span>
         </div>
       </div>
       <p class="tutorial-redeem-prompt">press space to redeem sol</p>

@@ -34,6 +34,7 @@ export const TUTORIAL_PROMPTS = {
 // Current tutorial state
 let currentPhase: TutorialPhase = null;
 let feverStats: FeverStats | null = null;
+let tutorialStartTime: number | null = null;
 
 // Callbacks
 let onPhaseChangeCallback: ((phase: TutorialPhase) => void) | null = null;
@@ -239,4 +240,17 @@ export function getMaxChain(): number {
 export function resetTutorial(): void {
   currentPhase = null;
   feverStats = null;
+  tutorialStartTime = null;
+}
+
+// Tutorial timer - starts on first keystroke
+export function startTutorialTimer(): void {
+  if (tutorialStartTime === null) {
+    tutorialStartTime = Date.now();
+  }
+}
+
+export function getTutorialElapsedTime(): number {
+  if (tutorialStartTime === null) return 0;
+  return Date.now() - tutorialStartTime;
 }
