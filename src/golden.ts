@@ -240,6 +240,13 @@ export function captureGolden(): void {
   }
 }
 
+// Trigger a fever capture (every letter is golden in fever mode)
+export function triggerFeverCapture(wordIndex: number, charIndex: number): void {
+  if (onCaptureCallback) {
+    onCaptureCallback(1, wordIndex, charIndex); // Reward of 1 for each fever letter
+  }
+}
+
 // Check for expired golden letters (call periodically or on render)
 export function checkExpiry(): boolean {
   if (!activeGolden) return false;

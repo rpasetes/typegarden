@@ -2,13 +2,13 @@ import './style.css';
 import { startTyping } from './typing.ts';
 import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow } from './ui.ts';
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
-import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, type TutorialPhase } from './tutorial.ts';
+import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, type TutorialPhase } from './tutorial.ts';
 import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
 
 // Initialize garden state (load from localStorage or create fresh)
@@ -86,6 +86,16 @@ function startTutorialPhase(phase: TutorialPhase): void {
   setGoldenEnabled(config.goldenEnabled);
   setSpawnInterval(config.goldenSpawnInterval);
 
+  // Configure fever mode styling and all-green letters
+  const isFever = phase === 'fever';
+  setFeverMode(isFever);
+  setAllLettersGreen(config.allLettersGreen);
+
+  // Hide chain counter when not in fever
+  if (!isFever) {
+    hideChainCounter();
+  }
+
   // Configure green letter if specified
   resetGreen();
   if (config.greenLetterPosition) {
@@ -130,6 +140,8 @@ function startTutorialPhase(phase: TutorialPhase): void {
       // Track keystrokes during fever for stats
       if (getCurrentPhase() === 'fever') {
         trackFeverKeystroke(correct);
+        // Update chain counter in real-time
+        renderChainCounter(getCurrentChain());
       }
     },
     isTutorial: true,
@@ -171,15 +183,27 @@ function handleTutorialPhaseComplete(): void {
   } else if (currentPhase === 'fever') {
     // Fever complete - show stats modal
     advancePhase(); // moves to 'stats'
+
+    // Turn off fever mode styling
+    setFeverMode(false);
+    setAllLettersGreen(false);
+    hideChainCounter();
+
     const feverStats = getFeverStats();
     const wpm = feverStats ? Math.round((feverStats.correctKeystrokes / 5) / ((Date.now() - feverStats.startTime) / 60000)) : 0;
     const totalKeystrokes = feverStats ? feverStats.correctKeystrokes + feverStats.incorrectKeystrokes : 0;
     const accuracy = feverStats && totalKeystrokes > 0 ? Math.round((feverStats.correctKeystrokes / totalKeystrokes) * 100) : 100;
     const goldenCaptures = feverStats?.goldenCaptures ?? 0;
+    const maxChain = getMaxChain();
 
-    renderTutorialStatsModal(wpm, accuracy, goldenCaptures, () => {
-      // Sol burst celebration
-      triggerSolBurstCelebration();
+    renderTutorialStatsModal(wpm, accuracy, maxChain, () => {
+      // Yellow screen glow on redemption
+      triggerScreenGlow();
+
+      // Sol burst celebration (with slight delay for glow to start)
+      setTimeout(() => {
+        triggerSolBurstCelebration();
+      }, 150);
 
       // Mark tutorial complete
       garden = { ...garden, tutorialComplete: true };

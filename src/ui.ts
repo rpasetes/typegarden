@@ -8,6 +8,13 @@ import { isGreenPosition, getActiveGreen } from './green.ts';
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
 
+// Track if all letters should be green (fever mode)
+let allLettersGreenMode = false;
+
+export function setAllLettersGreen(enabled: boolean): void {
+  allLettersGreenMode = enabled;
+}
+
 // Track when each word's animation completes (wordIndex -> completion timestamp)
 const animatingUntil = new Map<number, number>();
 
@@ -194,14 +201,19 @@ export function renderWords(state: TypingState): void {
         charEl.style.setProperty('--golden-fade-duration', `${fadeDuration}ms`);
       } else if (wasGolden && !isGolden) {
         // No longer golden - remove golden styling
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
-        charEl.style.removeProperty('--golden-fade-duration');
+        // In fever mode, all untyped letters are golden
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${feverGolden}`;
+        if (!feverGolden) charEl.style.removeProperty('--golden-fade-duration');
       } else if (wasGreen && !isGreen) {
         // No longer green - remove green styling
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${feverGolden}`;
       } else {
         // Normal update (not golden or green)
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+        // In fever mode, all untyped letters are golden
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}${feverGolden}`;
       }
 
       // Update cursor target
@@ -618,7 +630,7 @@ export function renderUpgradeChoice(
 export function renderTutorialStatsModal(
   wpm: number,
   accuracy: number,
-  goldenCaptures: number,
+  maxChain: number,
   onRedeem: () => void
 ): void {
   const app = document.getElementById('app');
@@ -638,8 +650,8 @@ export function renderTutorialStatsModal(
           <span class="tutorial-stat-label">accuracy</span>
         </div>
         <div class="tutorial-stat-item">
-          <span class="tutorial-stat-value">${goldenCaptures}</span>
-          <span class="tutorial-stat-label">golden</span>
+          <span class="tutorial-stat-value">${maxChain}x</span>
+          <span class="tutorial-stat-label">chain</span>
         </div>
       </div>
       <p class="tutorial-redeem-prompt">press space to redeem sol</p>
@@ -661,4 +673,50 @@ export function renderTutorialStatsModal(
   document.addEventListener('keydown', keyHandler);
 
   app.appendChild(modal);
+}
+
+// Fever mode body class for green theme
+export function setFeverMode(enabled: boolean): void {
+  if (enabled) {
+    document.body.classList.add('fever-mode');
+  } else {
+    document.body.classList.remove('fever-mode');
+  }
+}
+
+// Chain counter display
+export function renderChainCounter(chain: number): void {
+  let counter = document.getElementById('chain-counter');
+  if (!counter) {
+    counter = document.createElement('div');
+    counter.id = 'chain-counter';
+    counter.className = 'chain-counter';
+    document.getElementById('app')?.appendChild(counter);
+  }
+
+  counter.textContent = chain > 0 ? `${chain}x` : '';
+  counter.classList.toggle('visible', chain > 1);
+
+  // Trigger bump animation on increase
+  if (chain > 1) {
+    counter.classList.remove('bump');
+    // Force reflow to restart animation
+    void counter.offsetWidth;
+    counter.classList.add('bump');
+  }
+}
+
+export function hideChainCounter(): void {
+  const counter = document.getElementById('chain-counter');
+  if (counter) {
+    counter.classList.remove('visible');
+  }
+}
+
+// Screen glow effect on redemption
+export function triggerScreenGlow(): void {
+  const glow = document.createElement('div');
+  glow.className = 'screen-glow';
+  document.body.appendChild(glow);
+  setTimeout(() => glow.remove(), 800);
 }

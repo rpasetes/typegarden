@@ -12,6 +12,7 @@ export interface TutorialPhaseConfig {
   goldenStartWordIndex: number;
   greenLetterPosition: { wordIndex: number; charIndex: number } | null;
   solBarVisible: boolean;
+  allLettersGreen: boolean;  // Every char capturable in fever
 }
 
 export interface FeverStats {
@@ -19,6 +20,8 @@ export interface FeverStats {
   goldenCaptures: number;
   correctKeystrokes: number;
   incorrectKeystrokes: number;
+  currentChain: number;
+  maxChain: number;
 }
 
 // Tutorial prompt text content
@@ -125,6 +128,7 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: false,
+        allLettersGreen: false,
       };
 
     case 'mechanics':
@@ -135,16 +139,18 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         goldenStartWordIndex: findSentenceStartWordIndex(4), // Golden starts at sentence 4
         greenLetterPosition: findGreenLetterPosition(),
         solBarVisible: true,
+        allLettersGreen: false,
       };
 
     case 'fever':
       return {
         words: TUTORIAL_PROMPTS.fever.split(' '),
         goldenEnabled: true,
-        goldenSpawnInterval: 10, // 2x density
+        goldenSpawnInterval: 5, // High spawn rate for chain bursts
         goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: true,
+        allLettersGreen: true,  // Every letter capturable
       };
 
     default:
@@ -155,6 +161,7 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: true,
+        allLettersGreen: false,
       };
   }
 }
@@ -166,6 +173,8 @@ function startFeverTracking(): void {
     goldenCaptures: 0,
     correctKeystrokes: 0,
     incorrectKeystrokes: 0,
+    currentChain: 0,
+    maxChain: 0,
   };
 }
 
@@ -201,6 +210,30 @@ export function trackFeverKeystroke(correct: boolean): void {
 
 export function getFeverStats(): FeverStats | null {
   return feverStats;
+}
+
+// Chain tracking for fever mode
+export function incrementChain(): number {
+  if (feverStats) {
+    feverStats.currentChain++;
+    feverStats.maxChain = Math.max(feverStats.maxChain, feverStats.currentChain);
+    return feverStats.currentChain;
+  }
+  return 0;
+}
+
+export function breakChain(): void {
+  if (feverStats) {
+    feverStats.currentChain = 0;
+  }
+}
+
+export function getCurrentChain(): number {
+  return feverStats?.currentChain ?? 0;
+}
+
+export function getMaxChain(): number {
+  return feverStats?.maxChain ?? 0;
 }
 
 export function resetTutorial(): void {

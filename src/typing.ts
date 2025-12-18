@@ -1,8 +1,9 @@
 import type { GardenState } from './garden.ts';
 import { renderWords, setCursorActive } from './ui.ts';
 import { generateWords } from './words.ts';
-import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden } from './golden.ts';
+import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden, triggerFeverCapture } from './golden.ts';
 import { isGreenPosition, captureGreen } from './green.ts';
+import { getCurrentPhase, incrementChain, breakChain } from './tutorial.ts';
 
 export interface TypingState {
   words: string[];
@@ -322,6 +323,8 @@ function handleCharacter(char: string): void {
 
   // Track keystrokes
   const expectedChar = currentWord[currentTyped.length];
+  const isFever = getCurrentPhase() === 'fever';
+
   if (char === expectedChar) {
     currentState.correctKeystrokes++;
 
@@ -329,6 +332,12 @@ function handleCharacter(char: string): void {
     keystrokeTimestamps.push(Date.now());
     if (keystrokeTimestamps.length > SPEED_WINDOW_SIZE) {
       keystrokeTimestamps.shift();
+    }
+
+    // In fever mode, every correct keystroke is a golden capture
+    if (isFever) {
+      triggerFeverCapture(wordIndex, currentTyped.length);
+      incrementChain();
     }
 
     // Notify keystroke callback (for fever stats)
@@ -351,6 +360,11 @@ function handleCharacter(char: string): void {
     currentState.incorrectKeystrokes++;
     currentState.errors++;
     onTypo();
+
+    // Break chain in fever mode
+    if (isFever) {
+      breakChain();
+    }
 
     // Notify keystroke callback (for fever stats)
     if (onKeystrokeCallback) {

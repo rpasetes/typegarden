@@ -562,6 +562,89 @@ body {
   }
 }
 
+/* Fever Mode: Green Theme */
+body.fever-mode .char.golden {
+  color: #b8bb26;
+  text-shadow: 0 0 8px #b8bb26;
+  animation: none; /* No fade - letters stay until typed */
+  opacity: 1;
+}
+
+body.fever-mode .golden-particle {
+  background: #b8bb26;
+  box-shadow: 0 0 8px #b8bb26, 0 0 16px #b8bb26;
+}
+
+body.fever-mode .golden-particle--small {
+  box-shadow: 0 0 4px #b8bb26;
+}
+
+body.fever-mode .golden-particle--medium {
+  box-shadow: 0 0 8px #b8bb26, 0 0 12px #b8bb26;
+}
+
+body.fever-mode .golden-particle--large {
+  box-shadow: 0 0 12px #b8bb26, 0 0 20px #b8bb26, 0 0 30px #b8bb26;
+}
+
+/* All-green fever letters (capturable for chain) */
+.char.fever-green {
+  color: #b8bb26;
+  text-shadow: 0 0 3px rgba(184, 187, 38, 0.4);
+}
+
+.char.fever-green.typed {
+  color: var(--text-typed);
+  text-shadow: none;
+}
+
+/* Chain counter display */
+.chain-counter {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #b8bb26;
+  text-shadow: 0 0 12px #b8bb26;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 50;
+}
+
+.chain-counter.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Chain counter bump animation */
+.chain-counter.bump {
+  animation: chain-bump 0.15s ease-out;
+}
+
+@keyframes chain-bump {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Screen glow on redemption */
+.screen-glow {
+  position: fixed;
+  inset: 0;
+  background: rgba(250, 189, 47, 0);
+  pointer-events: none;
+  z-index: 999;
+  animation: screen-flash 0.8s ease-out forwards;
+}
+
+@keyframes screen-flash {
+  0% { background: rgba(250, 189, 47, 0); }
+  20% { background: rgba(250, 189, 47, 0.35); }
+  100% { background: rgba(250, 189, 47, 0); }
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   :root {
