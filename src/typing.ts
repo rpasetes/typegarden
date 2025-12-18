@@ -328,7 +328,22 @@ function handleCharacter(char: string): void {
   // Notify golden system of character typed (for spawn timing)
   onCharacterTyped(wordIndex, currentTyped.length, currentState.words);
 
-  // No auto-complete in endless mode - user must press space to advance
+  // In tutorial mode, check if we just completed the final word
+  if (tutorialMode && char === expectedChar) {
+    const newTyped = currentState.typed[wordIndex] ?? '';
+    const isLastWord = wordIndex === currentState.words.length - 1;
+    const isWordComplete = newTyped.length === currentWord.length;
+
+    if (isLastWord && isWordComplete) {
+      // Final character of tutorial typed - trigger completion immediately
+      if (onWordCompleteCallback) {
+        onWordCompleteCallback();
+      }
+      if (onCompleteCallback) {
+        onCompleteCallback(currentState);
+      }
+    }
+  }
 }
 
 export interface StartTypingOptions {
