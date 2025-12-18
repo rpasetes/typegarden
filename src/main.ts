@@ -52,10 +52,14 @@ setOnGoldenExpiry(() => {
   if (state) renderWords(state);
 });
 
+// Track if green has been captured to prevent duplicate phase advance
+let greenCaptured = false;
+
 // Set up green letter capture callback (triggers fever mode)
 setOnGreenCapture(() => {
   // Green captured during mechanics phase - transition to fever
-  if (getCurrentPhase() === 'mechanics') {
+  if (getCurrentPhase() === 'mechanics' && !greenCaptured) {
+    greenCaptured = true;
     fadeOutWords().then(() => {
       advancePhase(); // moves to 'fever'
       startTutorialPhase('fever');
@@ -150,16 +154,19 @@ function handleTutorialPhaseComplete(): void {
   } else if (currentPhase === 'mechanics') {
     // Mechanics completes when green letter is captured (handled by green callback)
     // But if they finish typing without capturing green, still advance
-    fadeOutWords().then(() => {
-      advancePhase();
-      startTutorialPhase('fever');
-    });
+    if (!greenCaptured) {
+      fadeOutWords().then(() => {
+        advancePhase();
+        startTutorialPhase('fever');
+      });
+    }
   } else if (currentPhase === 'fever') {
     // Fever complete - show stats modal
     advancePhase(); // moves to 'stats'
     const feverStats = getFeverStats();
     const wpm = feverStats ? Math.round((feverStats.correctKeystrokes / 5) / ((Date.now() - feverStats.startTime) / 60000)) : 0;
-    const accuracy = feverStats ? Math.round((feverStats.correctKeystrokes / (feverStats.correctKeystrokes + feverStats.incorrectKeystrokes)) * 100) : 100;
+    const totalKeystrokes = feverStats ? feverStats.correctKeystrokes + feverStats.incorrectKeystrokes : 0;
+    const accuracy = feverStats && totalKeystrokes > 0 ? Math.round((feverStats.correctKeystrokes / totalKeystrokes) * 100) : 100;
     const goldenCaptures = feverStats?.goldenCaptures ?? 0;
 
     renderTutorialStatsModal(wpm, accuracy, goldenCaptures, () => {
