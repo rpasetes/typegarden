@@ -462,12 +462,48 @@ export function hideSolBar(): void {
   const solBarEl = document.getElementById('sol-bar');
   if (!solBarEl) return;
   solBarEl.classList.add('hidden');
+  solBarEl.classList.remove('pop');
 }
 
-export function fadeInSolBar(): void {
+export function popInSolBar(): void {
   const solBarEl = document.getElementById('sol-bar');
   if (!solBarEl) return;
   solBarEl.classList.remove('hidden');
+  solBarEl.classList.add('pop');
+}
+
+// Legacy alias for backwards compatibility
+export function fadeInSolBar(): void {
+  popInSolBar();
+}
+
+// Triple-click detection state
+let solBarClickCount = 0;
+let solBarClickTimer: ReturnType<typeof setTimeout> | null = null;
+const TRIPLE_CLICK_TIMEOUT = 400;
+
+export function initSolBarReset(onReset: () => void): void {
+  const solBarEl = document.getElementById('sol-bar');
+  if (!solBarEl) return;
+
+  solBarEl.addEventListener('click', () => {
+    solBarClickCount++;
+
+    if (solBarClickTimer) {
+      clearTimeout(solBarClickTimer);
+    }
+
+    if (solBarClickCount >= 3) {
+      // Triple click detected - reset tutorial
+      solBarClickCount = 0;
+      onReset();
+    } else {
+      // Reset count after timeout
+      solBarClickTimer = setTimeout(() => {
+        solBarClickCount = 0;
+      }, TRIPLE_CLICK_TIMEOUT);
+    }
+  });
 }
 
 export function showFocusOverlay(): void {

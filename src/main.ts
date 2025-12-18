@@ -2,7 +2,7 @@ import './style.css';
 import { startTyping } from './typing.ts';
 import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, fadeInSolBar, renderTutorialStatsModal } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initSolBarReset } from './ui.ts';
 import { generateWords } from './words.ts';
 import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval } from './golden.ts';
@@ -107,9 +107,9 @@ function startTutorialPhase(phase: TutorialPhase): void {
     onWordComplete: () => {
       earnBaseSol();
 
-      // Fade in sol bar at end of intro (typing the final period)
+      // Pop in sol bar at end of intro (typing the final period)
       if (phase === 'intro') {
-        fadeInSolBar();
+        popInSolBar();
       }
     },
     onComplete: () => {
@@ -270,6 +270,13 @@ function handleKeyPress(): void {
 render(garden);
 initCursorIdleDetection();
 document.addEventListener('keydown', handleKeyPress);
+
+// Triple-click on sol bar resets tutorial progress
+initSolBarReset(() => {
+  garden = { ...initGarden(), sessionSol: 0, lifetimeSol: 0 };
+  saveGarden(garden);
+  window.location.reload();
+});
 
 // Focus overlay - show only on blur, not on load
 window.addEventListener('blur', showFocusOverlay);
