@@ -3,6 +3,7 @@ import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
 import { getActiveGolden, getFadeDuration } from './golden.ts';
+import { isGreenPosition } from './green.ts';
 
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
@@ -153,14 +154,21 @@ export function renderWords(state: TypingState): void {
         activeGolden.wordIndex === wordIndex &&
         activeGolden.charIndex === charIndex &&
         !isTyped;
+      const isGreen = isGreenPosition(wordIndex, charIndex) && !isTyped;
 
       // Update typing state classes
-      const hasCharNew = charEl.classList.contains('char-new') && !isGolden;
+      const hasCharNew = charEl.classList.contains('char-new') && !isGolden && !isGreen;
       const wasGolden = charEl.classList.contains('golden');
+      const wasGreen = charEl.classList.contains('green');
 
-      // Preserve golden animation - skip class updates if element should stay golden
+      // Preserve golden/green animation - skip class updates if element should stay special
       if (wasGolden && isGolden) {
         // Don't touch className - preserve animation
+      } else if (wasGreen && isGreen) {
+        // Don't touch className - preserve green animation
+      } else if (isGreen && !wasGreen) {
+        // Becoming green - set class
+        charEl.className = `char untyped green`;
       } else if (isGolden && !wasGolden) {
         // Becoming golden - set class and fade duration
         charEl.className = `char untyped golden`;
@@ -170,8 +178,11 @@ export function renderWords(state: TypingState): void {
         // No longer golden - remove golden styling
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
         charEl.style.removeProperty('--golden-fade-duration');
+      } else if (wasGreen && !isGreen) {
+        // No longer green - remove green styling
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
       } else {
-        // Normal update (not golden)
+        // Normal update (not golden or green)
         charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
       }
 
@@ -447,6 +458,18 @@ export function renderSolBar(sessionSol: number): void {
   solBarEl.innerHTML = `<span class="sol-icon">🌱</span><span class="sol-count">${sessionSol}</span>`;
 }
 
+export function hideSolBar(): void {
+  const solBarEl = document.getElementById('sol-bar');
+  if (!solBarEl) return;
+  solBarEl.classList.add('hidden');
+}
+
+export function fadeInSolBar(): void {
+  const solBarEl = document.getElementById('sol-bar');
+  if (!solBarEl) return;
+  solBarEl.classList.remove('hidden');
+}
+
 export function showFocusOverlay(): void {
   // Don't show if already visible
   if (document.querySelector('.focus-overlay')) return;
@@ -550,6 +573,54 @@ export function renderUpgradeChoice(
         modal.remove();
         onSelect(opt.id);
       }
+    }
+  };
+  document.addEventListener('keydown', keyHandler);
+
+  app.appendChild(modal);
+}
+
+export function renderTutorialStatsModal(
+  wpm: number,
+  accuracy: number,
+  goldenCaptures: number,
+  onRedeem: () => void
+): void {
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'tutorial-stats-modal';
+  modal.innerHTML = `
+    <div class="tutorial-stats-content">
+      <div class="tutorial-stats-grid">
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${wpm}</span>
+          <span class="tutorial-stat-label">wpm</span>
+        </div>
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${accuracy}%</span>
+          <span class="tutorial-stat-label">accuracy</span>
+        </div>
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${goldenCaptures}</span>
+          <span class="tutorial-stat-label">golden</span>
+        </div>
+      </div>
+      <p class="tutorial-redeem-prompt">press space to redeem sol</p>
+    </div>
+  `;
+
+  // Space key handler
+  const keyHandler = (e: KeyboardEvent) => {
+    if (e.key === ' ') {
+      e.preventDefault();
+      document.removeEventListener('keydown', keyHandler);
+      modal.classList.add('fade-out');
+      setTimeout(() => {
+        modal.remove();
+        onRedeem();
+      }, 300);
     }
   };
   document.addEventListener('keydown', keyHandler);
