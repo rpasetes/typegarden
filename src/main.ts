@@ -106,13 +106,12 @@ function startTutorialPhase(phase: TutorialPhase): void {
   startTyping(config.words, {
     onWordComplete: () => {
       earnBaseSol();
-
+    },
+    onComplete: () => {
       // Pop in sol bar at end of intro (typing the final period)
       if (phase === 'intro') {
         popInSolBar();
       }
-    },
-    onComplete: () => {
       // Phase completed - advance to next
       handleTutorialPhaseComplete();
     },
