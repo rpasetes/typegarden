@@ -216,9 +216,9 @@ function startEndlessWithEnjoy(): void {
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();
 
-  // Generate words starting with "enjoy"
-  const additionalWords = generateWords({ type: 'common', count: 39 });
-  const words = ['enjoy', ...additionalWords];
+  // Generate words starting with "thanks and enjoy"
+  const additionalWords = generateWords({ type: 'common', count: 37 });
+  const words = ['thanks', 'and', 'enjoy', ...additionalWords];
 
   // Mark run as active
   isRunActive = true;
