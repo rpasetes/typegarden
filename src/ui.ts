@@ -3,10 +3,17 @@ import type { TypingState } from './typing.ts';
 import { applyUpgradeEffects } from './upgrades.ts';
 import { getIsRunActive } from './main.ts';
 import { getActiveGolden, getFadeDuration } from './golden.ts';
-import { isGreenPosition } from './green.ts';
+import { isGreenPosition, getActiveGreen } from './green.ts';
 
 // Track the highest word index we've rendered (for detecting new words)
 let highestRenderedIndex = -1;
+
+// Track if all letters should be green (fever mode)
+let allLettersGreenMode = false;
+
+export function setAllLettersGreen(enabled: boolean): void {
+  allLettersGreenMode = enabled;
+}
 
 // Track when each word's animation completes (wordIndex -> completion timestamp)
 const animatingUntil = new Map<number, number>();
@@ -73,7 +80,11 @@ export function render(garden: GardenState): void {
 }
 
 // Only animate words within this range of current position
-const ANIMATE_AHEAD = 30;
+const ANIMATE_AHEAD = 25;
+
+// Only update character states within this window (performance optimization)
+const UPDATE_WINDOW_BEHIND = 1;
+const UPDATE_WINDOW_AHEAD = 5;
 
 export function renderWords(state: TypingState): void {
   const wordsEl = document.getElementById('words');
@@ -89,8 +100,9 @@ export function renderWords(state: TypingState): void {
   // Track char offset for new word animations
   let newCharOffset = 0;
 
-  // Get active golden letter once outside the loop
+  // Get active golden/green letters once outside the loop
   const activeGolden = getActiveGolden();
+  const activeGreen = getActiveGreen();
 
   for (let wordIndex = 0; wordIndex < state.words.length; wordIndex++) {
     const word = state.words[wordIndex] ?? '';
@@ -141,6 +153,18 @@ export function renderWords(state: TypingState): void {
     // Update word classes
     wordEl.className = `word${isCurrentWord ? ' current' : ''}${isPastWord ? ' past' : ''}${isMistaken ? ' mistaken' : ''}`;
 
+    // Skip character state updates for words outside the update window (performance)
+    const inUpdateWindow = wordIndex >= state.currentWordIndex - UPDATE_WINDOW_BEHIND &&
+                           wordIndex <= state.currentWordIndex + UPDATE_WINDOW_AHEAD;
+    // Always update words containing golden or green letters
+    const hasGolden = activeGolden && activeGolden.wordIndex === wordIndex;
+    const hasGreen = activeGreen && activeGreen.wordIndex === wordIndex;
+
+    if (!inUpdateWindow && !hasGolden && !hasGreen) {
+      if (isNewWord) newCharOffset += word.length + 1;
+      continue;
+    }
+
     // Update character states
     const charEls = wordEl.querySelectorAll('.char:not(.extra)');
     for (let charIndex = 0; charIndex < word.length; charIndex++) {
@@ -154,10 +178,11 @@ export function renderWords(state: TypingState): void {
         activeGolden.wordIndex === wordIndex &&
         activeGolden.charIndex === charIndex &&
         !isTyped;
-      const isGreen = isGreenPosition(wordIndex, charIndex) && !isTyped;
+      // Only show green letter after fade-in animation completes
+      const isGreen = inUpdateWindow && !isAnimating && isGreenPosition(wordIndex, charIndex) && !isTyped;
 
       // Update typing state classes
-      const hasCharNew = charEl.classList.contains('char-new') && !isGolden && !isGreen;
+      const hasCharNew = charEl.classList.contains('char-new');
       const wasGolden = charEl.classList.contains('golden');
       const wasGreen = charEl.classList.contains('green');
 
@@ -176,14 +201,22 @@ export function renderWords(state: TypingState): void {
         charEl.style.setProperty('--golden-fade-duration', `${fadeDuration}ms`);
       } else if (wasGolden && !isGolden) {
         // No longer golden - remove golden styling
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
-        charEl.style.removeProperty('--golden-fade-duration');
+        // In fever mode, all untyped letters are golden
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        const charNew = hasCharNew && !isGolden && !isGreen ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
+        if (!feverGolden) charEl.style.removeProperty('--golden-fade-duration');
       } else if (wasGreen && !isGreen) {
         // No longer green - remove green styling
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        const charNew = hasCharNew && !isGolden && !isGreen ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
       } else {
         // Normal update (not golden or green)
-        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${hasCharNew ? ' char-new' : ''}`;
+        // In fever mode, all untyped letters are golden (preserve char-new for fade-in)
+        const feverGolden = allLettersGreenMode && !isTyped ? ' golden' : '';
+        const charNew = hasCharNew ? ' char-new' : '';
+        charEl.className = `char ${isTyped ? (isCorrect ? 'correct' : 'incorrect') : 'untyped'}${charNew}${feverGolden}`;
       }
 
       // Update cursor target
@@ -600,11 +633,18 @@ export function renderUpgradeChoice(
 export function renderTutorialStatsModal(
   wpm: number,
   accuracy: number,
-  goldenCaptures: number,
+  maxChain: number,
+  elapsedMs: number,
+  totalSol: number,
   onRedeem: () => void
 ): void {
   const app = document.getElementById('app');
   if (!app) return;
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
   const modal = document.createElement('div');
   modal.className = 'tutorial-stats-modal';
@@ -620,11 +660,15 @@ export function renderTutorialStatsModal(
           <span class="tutorial-stat-label">accuracy</span>
         </div>
         <div class="tutorial-stat-item">
-          <span class="tutorial-stat-value">${goldenCaptures}</span>
-          <span class="tutorial-stat-label">golden</span>
+          <span class="tutorial-stat-value">${maxChain}x</span>
+          <span class="tutorial-stat-label">chain</span>
+        </div>
+        <div class="tutorial-stat-item">
+          <span class="tutorial-stat-value">${timeStr}</span>
+          <span class="tutorial-stat-label">time</span>
         </div>
       </div>
-      <p class="tutorial-redeem-prompt">press space to redeem sol</p>
+      <p class="tutorial-redeem-prompt">press space to redeem ${totalSol} sol</p>
     </div>
   `;
 
@@ -641,6 +685,88 @@ export function renderTutorialStatsModal(
     }
   };
   document.addEventListener('keydown', keyHandler);
+
+  app.appendChild(modal);
+}
+
+// Fever mode body class for green theme
+export function setFeverMode(enabled: boolean): void {
+  if (enabled) {
+    document.body.classList.add('fever-mode');
+  } else {
+    document.body.classList.remove('fever-mode');
+  }
+}
+
+// Chain counter display
+export function renderChainCounter(chain: number): void {
+  let counter = document.getElementById('chain-counter');
+  if (!counter) {
+    counter = document.createElement('div');
+    counter.id = 'chain-counter';
+    counter.className = 'chain-counter';
+    document.getElementById('app')?.appendChild(counter);
+  }
+
+  counter.textContent = chain > 0 ? `${chain}x` : '';
+  counter.classList.toggle('visible', chain > 1);
+
+  // Trigger bump animation on increase
+  if (chain > 1) {
+    counter.classList.remove('bump');
+    // Force reflow to restart animation
+    void counter.offsetWidth;
+    counter.classList.add('bump');
+  }
+}
+
+export function hideChainCounter(): void {
+  const counter = document.getElementById('chain-counter');
+  if (counter) {
+    counter.classList.remove('visible');
+  }
+}
+
+// Screen glow effect on redemption
+export function triggerScreenGlow(): void {
+  const glow = document.createElement('div');
+  glow.className = 'screen-glow';
+  document.body.appendChild(glow);
+  setTimeout(() => glow.remove(), 800);
+}
+
+// QR code modal for sharing
+export function renderQRModal(url: string): void {
+  // Don't show if already visible
+  if (document.querySelector('.qr-modal')) return;
+
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+
+  const modal = document.createElement('div');
+  modal.className = 'qr-modal';
+  modal.innerHTML = `
+    <div class="qr-content">
+      <img src="${qrUrl}" alt="QR Code" class="qr-image" />
+      <p class="qr-url">${url}</p>
+      <p class="qr-dismiss">press any key to dismiss</p>
+    </div>
+  `;
+
+  // Dismiss on any key
+  const keyHandler = (e: KeyboardEvent) => {
+    e.preventDefault();
+    document.removeEventListener('keydown', keyHandler);
+    modal.classList.add('fade-out');
+    setTimeout(() => modal.remove(), 300);
+  };
+
+  // Delay adding listener so the "?" keystroke doesn't immediately dismiss
+  setTimeout(() => {
+    document.addEventListener('keydown', keyHandler);
+  }, 100);
 
   app.appendChild(modal);
 }

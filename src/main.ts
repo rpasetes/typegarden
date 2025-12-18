@@ -2,14 +2,28 @@ import './style.css';
 import { startTyping } from './typing.ts';
 import { loadGarden, initGarden, saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
-import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut } from './ui.ts';
+import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow, renderQRModal } from './ui.ts';
 import { generateWords } from './words.ts';
-import { initSol, earnBaseSol, earnGoldenSol, setOnSolChange, getSolState } from './sol.ts';
-import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval } from './golden.ts';
+import { initSol, earnBaseSol, earnGoldenSol, earnBonusSol, setOnSolChange, getSolState } from './sol.ts';
+import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
-import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, type TutorialPhase } from './tutorial.ts';
+import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
 import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
+
+// Calculate performance bonus multiplier
+function calculatePerformanceBonus(wpm: number, accuracy: number, maxChain: number): number {
+  // WPM bonus: 0-50% (60 WPM = 25%, 120+ WPM = 50%)
+  const wpmBonus = Math.min(0.5, wpm / 240);
+
+  // Accuracy bonus: 0-50% (100% = 50%, 90% = 25%, <80% = 0%)
+  const accuracyBonus = accuracy >= 80 ? (accuracy - 80) * 0.025 : 0;
+
+  // Chain bonus: 0-100% (10 = ~33%, 30+ = 100%)
+  const chainBonus = Math.min(1, maxChain / 30);
+
+  return 1 + wpmBonus + accuracyBonus + chainBonus;
+}
 
 // Initialize garden state (load from localStorage or create fresh)
 let garden = loadGarden() ?? initGarden();
@@ -55,7 +69,7 @@ setOnGoldenExpiry(() => {
 // Track if green has been captured to prevent duplicate phase advance
 let greenCaptured = false;
 
-// Set up green letter capture callback (triggers fever mode)
+// Set up green letter capture callback (triggers fever mode or QR modal)
 setOnGreenCapture(() => {
   // Green captured during mechanics phase - transition to fever
   if (getCurrentPhase() === 'mechanics' && !greenCaptured) {
@@ -64,6 +78,10 @@ setOnGreenCapture(() => {
       advancePhase(); // moves to 'fever'
       startTutorialPhase('fever');
     });
+  }
+  // Green captured in endless mode (after tutorial) - show QR modal
+  if (getCurrentPhase() === null && garden.tutorialComplete) {
+    renderQRModal('https://typegarden.vercel.app');
   }
 });
 
@@ -86,6 +104,16 @@ function startTutorialPhase(phase: TutorialPhase): void {
   setGoldenEnabled(config.goldenEnabled);
   setSpawnInterval(config.goldenSpawnInterval);
 
+  // Configure fever mode styling and all-green letters
+  const isFever = phase === 'fever';
+  setFeverMode(isFever);
+  setAllLettersGreen(config.allLettersGreen);
+
+  // Hide chain counter when not in fever
+  if (!isFever) {
+    hideChainCounter();
+  }
+
   // Configure green letter if specified
   resetGreen();
   if (config.greenLetterPosition) {
@@ -99,6 +127,9 @@ function startTutorialPhase(phase: TutorialPhase): void {
   render(garden);
   resetScroll();
   resetGolden();
+
+  // Set golden start word index (after resetGolden which clears it)
+  setGoldenStartWordIndex(config.goldenStartWordIndex);
 
   // Hide sol bar for intro phase
   if (!config.solBarVisible) {
@@ -124,9 +155,14 @@ function startTutorialPhase(phase: TutorialPhase): void {
       handleTutorialPhaseComplete();
     },
     onKeystroke: (correct) => {
+      // Start tutorial timer on first keystroke
+      startTutorialTimer();
+
       // Track keystrokes during fever for stats
       if (getCurrentPhase() === 'fever') {
         trackFeverKeystroke(correct);
+        // Update chain counter in real-time
+        renderChainCounter(getCurrentChain());
       }
     },
     isTutorial: true,
@@ -168,15 +204,38 @@ function handleTutorialPhaseComplete(): void {
   } else if (currentPhase === 'fever') {
     // Fever complete - show stats modal
     advancePhase(); // moves to 'stats'
+
+    // Turn off fever mode styling
+    setFeverMode(false);
+    setAllLettersGreen(false);
+    hideChainCounter();
+
     const feverStats = getFeverStats();
     const wpm = feverStats ? Math.round((feverStats.correctKeystrokes / 5) / ((Date.now() - feverStats.startTime) / 60000)) : 0;
     const totalKeystrokes = feverStats ? feverStats.correctKeystrokes + feverStats.incorrectKeystrokes : 0;
     const accuracy = feverStats && totalKeystrokes > 0 ? Math.round((feverStats.correctKeystrokes / totalKeystrokes) * 100) : 100;
-    const goldenCaptures = feverStats?.goldenCaptures ?? 0;
+    const maxChain = getMaxChain();
+    const elapsedTime = getTutorialElapsedTime();
 
-    renderTutorialStatsModal(wpm, accuracy, goldenCaptures, () => {
-      // Sol burst celebration
-      triggerSolBurstCelebration();
+    // Calculate total sol with performance bonus
+    const baseSol = getSolState().sessionSol;
+    const bonusMultiplier = calculatePerformanceBonus(wpm, accuracy, maxChain);
+    const totalSol = Math.floor(baseSol * bonusMultiplier);
+
+    renderTutorialStatsModal(wpm, accuracy, maxChain, elapsedTime, totalSol, () => {
+      // Apply bonus sol
+      const bonusSol = totalSol - baseSol;
+      if (bonusSol > 0) {
+        earnBonusSol(bonusSol);
+      }
+
+      // Yellow screen glow on redemption
+      triggerScreenGlow();
+
+      // Sol burst celebration (with slight delay for glow to start)
+      setTimeout(() => {
+        triggerSolBurstCelebration();
+      }, 150);
 
       // Mark tutorial complete
       garden = { ...garden, tutorialComplete: true };
@@ -209,13 +268,21 @@ function startEndlessWithEnjoy(): void {
   render(garden);
   resetScroll();
   resetGolden();
+  resetGreen();
+
+  // Set green letter at "?" in "time?" (word index 9, char index 4)
+  setGreenLetterPosition(9, 4);
 
   // Prepare words element for fade-in transition
   prepareWordsFadeIn();
 
-  // Generate words starting with "enjoy"
-  const additionalWords = generateWords({ type: 'common', count: 39 });
-  const words = ['enjoy', ...additionalWords];
+  // Generate words starting with challenge prompt + easter egg
+  const additionalWords = generateWords({ type: 'common', count: 30 });
+  const words = [
+    'thanks', 'and', 'enjoy,', 'think', 'you', 'can', 'beat', 'my', 'demo', 'time?',
+    'control', 'shift', 'backspace', 'resets', 'to', 'tutorial',
+    ...additionalWords,
+  ];
 
   // Mark run as active
   isRunActive = true;

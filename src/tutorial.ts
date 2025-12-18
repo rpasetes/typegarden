@@ -9,8 +9,10 @@ export interface TutorialPhaseConfig {
   words: string[];
   goldenEnabled: boolean;
   goldenSpawnInterval: number;
+  goldenStartWordIndex: number;
   greenLetterPosition: { wordIndex: number; charIndex: number } | null;
   solBarVisible: boolean;
+  allLettersGreen: boolean;  // Every char capturable in fever
 }
 
 export interface FeverStats {
@@ -18,18 +20,21 @@ export interface FeverStats {
   goldenCaptures: number;
   correctKeystrokes: number;
   incorrectKeystrokes: number;
+  currentChain: number;
+  maxChain: number;
 }
 
 // Tutorial prompt text content
 export const TUTORIAL_PROMPTS = {
   intro: "welcome to typegarden, a game that grows the more you type: handcrafted by russell antonie pasetes.",
-  mechanics: "every correct word you type gains you more sol. think of it as sunlight for your garden. you are free to make any mistakes, as long as you keep moving forward. over time you will notice golden letters fade into view as you continue typing. catch them in time and you'll gain a burst of sol for your garden. be sure to stay in flow, these characters can be quite tricky to catch if you're not careful. sometimes, rarer characters appear that are colored differently from the usual golden letter! pop them for something special,",
-  fever: "placeholder text for fever mode demo content that will be provided later and should be approximately one hundred words in length to match the fever rush duration specification from the tutorial plan document", // TBD: Custom 100-word demo message
+  mechanics: "every correct word you type gains you more sol. think of it as sunlight for your garden. you are free to make any mistakes, as long as you keep moving forward. over time you will notice golden letters appear as you type. catch them in time to gain a sol burst. stay in flow and you will catch more golden letters. sometimes, rarer characters appear that are different from the usual golden letter. type them to trigger something special!",
+  fever: "yooo welcome to fever mode lmao every letter is golden now so just go crazy and collect everything you can. dont mess up tho or your chain breaks and thats kinda sad. anyway yeah ive been practicing this demo so many times im actually so tired rn. did i get a perfect streak so far? someone in the audience let me know. especially in the back, idk if yall can read this haha. almost done i think. gg wp see ya"
 };
 
 // Current tutorial state
 let currentPhase: TutorialPhase = null;
 let feverStats: FeverStats | null = null;
+let tutorialStartTime: number | null = null;
 
 // Callbacks
 let onPhaseChangeCallback: ((phase: TutorialPhase) => void) | null = null;
@@ -94,6 +99,26 @@ function findGreenLetterPosition(): { wordIndex: number; charIndex: number } | n
   return null;
 }
 
+// Find the word index where sentence N starts (1-indexed)
+// Sentences end with . ! or ?
+function findSentenceStartWordIndex(sentenceNumber: number): number {
+  const words = TUTORIAL_PROMPTS.mechanics.split(' ');
+  let currentSentence = 1;
+
+  if (sentenceNumber <= 1) return 0;
+
+  for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
+    const word = words[wordIndex];
+    if (word && /[.!?]$/.test(word)) {
+      currentSentence++;
+      if (currentSentence === sentenceNumber) {
+        return wordIndex + 1; // Next word starts the new sentence
+      }
+    }
+  }
+  return 0;
+}
+
 export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
   switch (phase) {
     case 'intro':
@@ -101,8 +126,10 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         words: TUTORIAL_PROMPTS.intro.split(' '),
         goldenEnabled: false,
         goldenSpawnInterval: 20,
+        goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: false,
+        allLettersGreen: false,
       };
 
     case 'mechanics':
@@ -110,17 +137,21 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         words: TUTORIAL_PROMPTS.mechanics.split(' '),
         goldenEnabled: true,
         goldenSpawnInterval: 20, // Normal spawn rate
+        goldenStartWordIndex: findSentenceStartWordIndex(4), // Golden starts at sentence 4
         greenLetterPosition: findGreenLetterPosition(),
         solBarVisible: true,
+        allLettersGreen: false,
       };
 
     case 'fever':
       return {
         words: TUTORIAL_PROMPTS.fever.split(' '),
         goldenEnabled: true,
-        goldenSpawnInterval: 10, // 2x density
+        goldenSpawnInterval: 5, // High spawn rate for chain bursts
+        goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: true,
+        allLettersGreen: true,  // Every letter capturable
       };
 
     default:
@@ -128,8 +159,10 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
         words: [],
         goldenEnabled: true,
         goldenSpawnInterval: 20,
+        goldenStartWordIndex: 0,
         greenLetterPosition: null,
         solBarVisible: true,
+        allLettersGreen: false,
       };
   }
 }
@@ -141,6 +174,8 @@ function startFeverTracking(): void {
     goldenCaptures: 0,
     correctKeystrokes: 0,
     incorrectKeystrokes: 0,
+    currentChain: 0,
+    maxChain: 0,
   };
 }
 
@@ -178,7 +213,44 @@ export function getFeverStats(): FeverStats | null {
   return feverStats;
 }
 
+// Chain tracking for fever mode
+export function incrementChain(): number {
+  if (feverStats) {
+    feverStats.currentChain++;
+    feverStats.maxChain = Math.max(feverStats.maxChain, feverStats.currentChain);
+    return feverStats.currentChain;
+  }
+  return 0;
+}
+
+export function breakChain(): void {
+  if (feverStats) {
+    feverStats.currentChain = 0;
+  }
+}
+
+export function getCurrentChain(): number {
+  return feverStats?.currentChain ?? 0;
+}
+
+export function getMaxChain(): number {
+  return feverStats?.maxChain ?? 0;
+}
+
 export function resetTutorial(): void {
   currentPhase = null;
   feverStats = null;
+  tutorialStartTime = null;
+}
+
+// Tutorial timer - starts on first keystroke
+export function startTutorialTimer(): void {
+  if (tutorialStartTime === null) {
+    tutorialStartTime = Date.now();
+  }
+}
+
+export function getTutorialElapsedTime(): number {
+  if (tutorialStartTime === null) return 0;
+  return Date.now() - tutorialStartTime;
 }
