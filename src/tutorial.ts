@@ -5,7 +5,6 @@
 import type { GardenState } from './garden.ts';
 import type { FeverStats } from './core/types.ts';
 import { feverSystem } from './systems/FeverSystem.ts';
-import { eventBus } from './core/EventBus.ts';
 import { tutorialStateMachine, TUTORIAL_PROMPTS as STATE_MACHINE_PROMPTS } from './state/TutorialStateMachine.ts';
 import type { TutorialPhaseConfig } from './state/TutorialStateMachine.ts';
 
@@ -17,25 +16,6 @@ export type { FeverStats };
 
 // Re-export prompts for backwards compatibility
 export const TUTORIAL_PROMPTS = STATE_MACHINE_PROMPTS;
-
-// Legacy callbacks - still used by main.ts during dual-write phase
-let onPhaseChangeCallback: ((phase: TutorialPhase) => void) | null = null;
-let onFeverEndCallback: ((stats: FeverStats, wpm: number, accuracy: number) => void) | null = null;
-
-export function setOnPhaseChange(callback: (phase: TutorialPhase) => void): void {
-  onPhaseChangeCallback = callback;
-}
-
-export function setOnFeverEnd(callback: (stats: FeverStats, wpm: number, accuracy: number) => void): void {
-  onFeverEndCallback = callback;
-
-  // Subscribe to FEVER_ENDED events and forward to legacy callback
-  eventBus.on('FEVER_ENDED', (event) => {
-    if (onFeverEndCallback) {
-      onFeverEndCallback(event.stats, event.wpm, event.accuracy);
-    }
-  });
-}
 
 export function shouldShowTutorial(garden: GardenState): boolean {
   return !garden.tutorialComplete;
@@ -52,14 +32,7 @@ export function startTutorial(): void {
 export function advancePhase(): TutorialPhase {
   // Delegate to state machine - it handles the transition and emits events
   tutorialStateMachine.completePhase();
-
-  // Legacy callback support
-  const newPhase = tutorialStateMachine.getPhase();
-  if (onPhaseChangeCallback) {
-    onPhaseChangeCallback(newPhase);
-  }
-
-  return newPhase;
+  return tutorialStateMachine.getPhase();
 }
 
 // getTutorialConfig now delegates to state machine

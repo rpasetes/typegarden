@@ -4,7 +4,7 @@ import { saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
 import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow, renderQRModal } from './ui.ts';
 import { generateWords } from './words.ts';
-import { earnBaseSol, earnGoldenSol, earnBonusSol, setOnSolChange, getSolState } from './sol.ts';
+import { earnBaseSol, earnGoldenSol, earnBonusSol, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
@@ -37,11 +37,8 @@ function getGarden(): GardenState {
   return game.getGarden();
 }
 
-// Set up sol change listener to update UI
-// Note: Garden state updates are now handled by Game class via events
-setOnSolChange((solState) => {
-  renderSolBar(solState.sessionSol);
-});
+// Sol bar updates are now handled by RenderSystem via SOL_EARNED events
+// Garden state updates are handled by Game class via events
 
 // Set up golden letter capture callback
 // NOTE: GOLDEN_CAPTURED event is emitted by GoldenSystem, no dual-write needed here
