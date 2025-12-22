@@ -1,44 +1,44 @@
-// Green Letter System
-// Rare letter that triggers fever mode when captured
+// Green module - thin wrapper for backwards compatibility
+// Delegates to GreenSystem (the new event-driven implementation)
+// TODO: Remove this file in Phase 7 cleanup
 
-export interface GreenLetter {
-  wordIndex: number;
-  charIndex: number;
-}
+import { greenSystem, type GreenLetter } from './systems/GreenSystem.ts';
+import { eventBus } from './core/EventBus.ts';
 
-// Active green letter (deterministic position, set by tutorial)
-let activeGreen: GreenLetter | null = null;
+// Re-export types
+export type { GreenLetter };
 
-// Callback for when green is captured
+// Legacy callback - still used by main.ts during dual-write phase
 let onCaptureCallback: (() => void) | null = null;
 
 export function setOnGreenCapture(callback: () => void): void {
   onCaptureCallback = callback;
+
+  // Subscribe to GREEN_CAPTURED events and forward to legacy callback
+  // This bridges the old callback system with the new event system
+  eventBus.on('GREEN_CAPTURED', () => {
+    if (onCaptureCallback) {
+      onCaptureCallback();
+    }
+  });
 }
 
 export function setGreenLetterPosition(wordIndex: number, charIndex: number): void {
-  activeGreen = { wordIndex, charIndex };
+  greenSystem.setPosition(wordIndex, charIndex);
 }
 
 export function getActiveGreen(): GreenLetter | null {
-  return activeGreen;
+  return greenSystem.getActive();
 }
 
 export function isGreenPosition(wordIndex: number, charIndex: number): boolean {
-  if (!activeGreen) return false;
-  return activeGreen.wordIndex === wordIndex && activeGreen.charIndex === charIndex;
+  return greenSystem.isPosition(wordIndex, charIndex);
 }
 
 export function captureGreen(): void {
-  if (!activeGreen) return;
-
-  activeGreen = null;
-
-  if (onCaptureCallback) {
-    onCaptureCallback();
-  }
+  greenSystem.capture();
 }
 
 export function resetGreen(): void {
-  activeGreen = null;
+  greenSystem.reset();
 }

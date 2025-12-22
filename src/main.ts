@@ -91,14 +91,14 @@ setOnGoldenExpiry(() => {
 let greenCaptured = false;
 
 // Set up green letter capture callback (triggers fever mode or QR modal)
+// NOTE: GREEN_CAPTURED event is emitted by GreenSystem, no dual-write needed here
 setOnGreenCapture(() => {
-  // Dual-write: emit event
-  eventBus.emit({ type: 'GREEN_CAPTURED' });
-
   // Green captured during mechanics phase - transition to fever
   if (getCurrentPhase() === 'mechanics' && !greenCaptured) {
     greenCaptured = true;
     fadeOutWords().then(() => {
+      // Guard against double execution
+      if (getCurrentPhase() !== 'mechanics') return;
       advancePhase(); // moves to 'fever'
       startTutorialPhase('fever');
     });
@@ -212,6 +212,8 @@ function handleTutorialPhaseComplete(): void {
       popInSolBar();
       // Wait for sol bar animation to complete (500ms) before showing next prompt
       setTimeout(() => {
+        // Guard against double execution (HMR can cause duplicate calls)
+        if (getCurrentPhase() !== 'intro') return;
         advancePhase();
         startTutorialPhase('mechanics');
       }, 600);
@@ -221,6 +223,8 @@ function handleTutorialPhaseComplete(): void {
     // But if they finish typing without capturing green, still advance
     if (!greenCaptured) {
       fadeOutWords().then(() => {
+        // Guard against double execution
+        if (getCurrentPhase() !== 'mechanics') return;
         advancePhase();
         startTutorialPhase('fever');
       });

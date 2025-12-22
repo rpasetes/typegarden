@@ -1,4 +1,4 @@
-// EventBus - Centralized pub/sub for game events
+1// EventBus - Centralized pub/sub for game events
 // Based on Event Queue pattern from Game Programming Patterns by Robert Nystrom
 //
 // Replaces callback hell with typed, traceable events.

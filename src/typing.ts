@@ -392,11 +392,12 @@ function handleCharacter(char: string): void {
     const isWordComplete = newTyped.length === currentWord.length;
 
     if (isLastWord && isWordComplete) {
-      // Final character of tutorial typed - trigger completion immediately
+      // Final character of current words typed
       if (onWordCompleteCallback) {
         onWordCompleteCallback();
       }
-      if (onCompleteCallback) {
+      // Only trigger completion if no more tutorial sentences remain
+      if (onCompleteCallback && remainingTutorialSentences.length === 0) {
         onCompleteCallback(currentState);
       }
     }
