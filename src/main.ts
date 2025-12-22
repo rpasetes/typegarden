@@ -51,15 +51,8 @@ setOnSolChange((solState) => {
 });
 
 // Set up golden letter capture callback
+// NOTE: GOLDEN_CAPTURED event is emitted by GoldenSystem, no dual-write needed here
 setOnGoldenCapture((reward, wordIndex, charIndex) => {
-  // Dual-write: emit event
-  eventBus.emit({
-    type: 'GOLDEN_CAPTURED',
-    reward: reward as 1 | 2 | 3,
-    wordIndex,
-    charIndex,
-  });
-
   // Spawn particles from the captured letter's position (scaled by reward)
   const pos = getCharacterPosition(wordIndex, charIndex);
   if (pos) {
@@ -79,10 +72,8 @@ setOnGoldenCapture((reward, wordIndex, charIndex) => {
 });
 
 // Set up golden letter expiry callback to trigger re-render
+// NOTE: GOLDEN_EXPIRED event is emitted by GoldenSystem, no dual-write needed here
 setOnGoldenExpiry(() => {
-  // Dual-write: emit event
-  eventBus.emit({ type: 'GOLDEN_EXPIRED' });
-
   const state = getTypingState();
   if (state) renderWords(state);
 });
