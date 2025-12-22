@@ -1,7 +1,11 @@
 // Tutorial System
 // Guides new players through intro, mechanics, and fever rush
+// TODO: Phase 4 will extract this into TutorialStateMachine
 
 import type { GardenState } from './garden.ts';
+import type { FeverStats } from './core/types.ts';
+import { feverSystem } from './systems/FeverSystem.ts';
+import { eventBus } from './core/EventBus.ts';
 
 export type TutorialPhase = 'intro' | 'mechanics' | 'fever' | 'stats' | null;
 
@@ -15,14 +19,8 @@ export interface TutorialPhaseConfig {
   allLettersGreen: boolean;  // Every char capturable in fever
 }
 
-export interface FeverStats {
-  startTime: number;
-  goldenCaptures: number;
-  correctKeystrokes: number;
-  incorrectKeystrokes: number;
-  currentChain: number;
-  maxChain: number;
-}
+// Re-export FeverStats for backwards compatibility
+export type { FeverStats };
 
 // Tutorial prompt text content
 export const TUTORIAL_PROMPTS = {
@@ -33,10 +31,9 @@ export const TUTORIAL_PROMPTS = {
 
 // Current tutorial state
 let currentPhase: TutorialPhase = null;
-let feverStats: FeverStats | null = null;
 let tutorialStartTime: number | null = null;
 
-// Callbacks
+// Legacy callbacks - still used by main.ts during dual-write phase
 let onPhaseChangeCallback: ((phase: TutorialPhase) => void) | null = null;
 let onFeverEndCallback: ((stats: FeverStats, wpm: number, accuracy: number) => void) | null = null;
 
@@ -46,6 +43,13 @@ export function setOnPhaseChange(callback: (phase: TutorialPhase) => void): void
 
 export function setOnFeverEnd(callback: (stats: FeverStats, wpm: number, accuracy: number) => void): void {
   onFeverEndCallback = callback;
+
+  // Subscribe to FEVER_ENDED events and forward to legacy callback
+  eventBus.on('FEVER_ENDED', (event) => {
+    if (onFeverEndCallback) {
+      onFeverEndCallback(event.stats, event.wpm, event.accuracy);
+    }
+  });
 }
 
 export function shouldShowTutorial(garden: GardenState): boolean {
@@ -58,26 +62,35 @@ export function getCurrentPhase(): TutorialPhase {
 
 export function startTutorial(): void {
   currentPhase = 'intro';
-  feverStats = null;
+  feverSystem.reset();
 }
 
 export function advancePhase(): TutorialPhase {
+  const previousPhase = currentPhase;
+
   switch (currentPhase) {
     case 'intro':
       currentPhase = 'mechanics';
       break;
     case 'mechanics':
       currentPhase = 'fever';
-      startFeverTracking();
+      feverSystem.start();
       break;
     case 'fever':
       currentPhase = 'stats';
-      endFeverTracking();
+      feverSystem.end();
       break;
     case 'stats':
       currentPhase = null;
       break;
   }
+
+  // Emit phase change event
+  eventBus.emit({
+    type: 'PHASE_CHANGED',
+    from: previousPhase,
+    to: currentPhase,
+  });
 
   if (onPhaseChangeCallback) {
     onPhaseChangeCallback(currentPhase);
@@ -167,79 +180,39 @@ export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
   }
 }
 
-// Fever stats tracking
-function startFeverTracking(): void {
-  feverStats = {
-    startTime: Date.now(),
-    goldenCaptures: 0,
-    correctKeystrokes: 0,
-    incorrectKeystrokes: 0,
-    currentChain: 0,
-    maxChain: 0,
-  };
-}
-
-function endFeverTracking(): void {
-  if (!feverStats) return;
-
-  const duration = Date.now() - feverStats.startTime;
-  const minutes = duration / 60000;
-  const wpm = minutes > 0 ? Math.round((feverStats.correctKeystrokes / 5) / minutes) : 0;
-  const total = feverStats.correctKeystrokes + feverStats.incorrectKeystrokes;
-  const accuracy = total > 0 ? Math.round((feverStats.correctKeystrokes / total) * 100) : 100;
-
-  if (onFeverEndCallback) {
-    onFeverEndCallback(feverStats, wpm, accuracy);
-  }
-}
-
+// Fever stats tracking - delegates to FeverSystem
 export function trackFeverGoldenCapture(): void {
-  if (feverStats) {
-    feverStats.goldenCaptures++;
-  }
+  feverSystem.trackGoldenCapture();
 }
 
 export function trackFeverKeystroke(correct: boolean): void {
-  if (feverStats) {
-    if (correct) {
-      feverStats.correctKeystrokes++;
-    } else {
-      feverStats.incorrectKeystrokes++;
-    }
-  }
+  feverSystem.trackKeystroke(correct);
 }
 
 export function getFeverStats(): FeverStats | null {
-  return feverStats;
+  return feverSystem.getStats();
 }
 
-// Chain tracking for fever mode
+// Chain tracking - delegates to FeverSystem
 export function incrementChain(): number {
-  if (feverStats) {
-    feverStats.currentChain++;
-    feverStats.maxChain = Math.max(feverStats.maxChain, feverStats.currentChain);
-    return feverStats.currentChain;
-  }
-  return 0;
+  return feverSystem.incrementChain();
 }
 
 export function breakChain(): void {
-  if (feverStats) {
-    feverStats.currentChain = 0;
-  }
+  feverSystem.breakChain();
 }
 
 export function getCurrentChain(): number {
-  return feverStats?.currentChain ?? 0;
+  return feverSystem.getCurrentChain();
 }
 
 export function getMaxChain(): number {
-  return feverStats?.maxChain ?? 0;
+  return feverSystem.getMaxChain();
 }
 
 export function resetTutorial(): void {
   currentPhase = null;
-  feverStats = null;
+  feverSystem.reset();
   tutorialStartTime = null;
 }
 

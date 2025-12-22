@@ -179,7 +179,8 @@ export function renderWords(state: TypingState): void {
         activeGolden.charIndex === charIndex &&
         !isTyped;
       // Only show green letter after fade-in animation completes
-      const isGreen = inUpdateWindow && !isAnimating && isGreenPosition(wordIndex, charIndex) && !isTyped;
+      // Use hasGreen to allow green even outside normal update window (it's why we didn't skip this word)
+      const isGreen = (inUpdateWindow || hasGreen) && !isAnimating && isGreenPosition(wordIndex, charIndex) && !isTyped;
 
       // Update typing state classes
       const hasCharNew = charEl.classList.contains('char-new');
