@@ -1,8 +1,24 @@
-# State Pattern Notes — TypeGarden Refactor
+# Game Programming Patterns — TypeGarden Refactor
 
 ## Overview
 
-The State pattern from *Game Programming Patterns* by Robert Nystrom formalizes phase transitions into explicit state classes. Each state knows:
+This refactor applies patterns from *Game Programming Patterns* by Robert Nystrom to restructure TypeGarden from callback-centric architecture to clean event-driven systems.
+
+### Patterns Applied
+
+| Pattern | Solves | Applied To |
+|---------|--------|------------|
+| **Event Queue** | Callback hell, implicit control flow | `EventBus` replaces 8+ callbacks |
+| **State** | Scattered tutorial logic | `TutorialStateMachine` for phases |
+| **Command** | 50+ line handleKeydown | Input commands (TypeChar, Backspace, Space) |
+| **Component** | main.ts god object | Focused systems (Golden, Green, Sol, etc.) |
+| **Observer** | UI querying game state | `RenderSystem` subscribes to events |
+
+---
+
+## State Pattern
+
+The State pattern formalizes phase transitions into explicit state classes. Each state knows:
 - What actions to perform on enter/exit
 - Which events it handles
 - Which state to transition to
@@ -124,4 +140,35 @@ Tests run in ~83ms without browser.
 
 ---
 
-*Part of the Game Programming Patterns refactor (Phase 4)*
+## Phase 5: Observer Rendering (Incremental)
+
+Phase 5 introduced `RenderSystem` as an Observer for event-driven UI updates.
+
+### What's Event-Driven Now
+- Sol bar updates (`SOL_EARNED` → `renderSolBar()`)
+- Chain counter (`CHAIN_UPDATED` → `renderChainCounter()`)
+- Fever mode styling (`PHASE_CHANGED` → `setFeverMode()`)
+
+### What's NOT Event-Driven (Intentionally Deferred)
+- `renderWords()` - Still receives `TypingState` directly
+- Special character detection - Still queries `getActiveGolden()`, `isGreenPosition()`
+- Character class application - Hardcoded for golden/green only
+
+### Why Deferred?
+The word renderer is 200+ lines handling:
+- Static word display
+- Typed character state (correct/incorrect)
+- Special character highlighting
+- Animation timing
+- Cursor positioning
+
+Future features (rhythm mode, chaos mode) will require fundamental changes:
+- Multiple special character types (purple `+`, red `*`)
+- Mutable display layer (chaos mode mutations)
+- Dynamic word insertion
+
+This warrants a dedicated **Phase 8: Typing Engine Refactor** on its own branch.
+
+---
+
+*Part of the Game Programming Patterns refactor (Phases 1-7)*
