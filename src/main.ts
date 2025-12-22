@@ -11,6 +11,10 @@ import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCeleb
 import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
 import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
 import { eventBus } from './core/EventBus.ts';
+import { renderSystem } from './render/RenderSystem.ts';
+
+// Initialize RenderSystem (subscribes to events)
+renderSystem.init();
 
 // Enable event debugging in development
 if (import.meta.env.DEV) {
