@@ -18,7 +18,7 @@ export interface FeverStats {
 export type GameEvent =
   // Input events
   | { type: 'KEYSTROKE'; key: string; correct: boolean; wordIndex: number; charIndex: number }
-  | { type: 'WORD_COMPLETE'; wordIndex: number }
+  | { type: 'WORD_COMPLETED'; wordIndex: number; word: string; correct: boolean }
   | { type: 'SESSION_STARTED'; mode: 'tutorial' | 'endless' }
   | { type: 'SESSION_ENDED' }
 
