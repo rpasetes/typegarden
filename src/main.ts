@@ -10,6 +10,13 @@ import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
 import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
 import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
+import { eventBus } from './core/EventBus.ts';
+
+// Enable event debugging in development
+if (import.meta.env.DEV) {
+  eventBus.setDebug(true);
+  console.log('[TypeGarden] EventBus initialized with debug mode');
+}
 
 // Calculate performance bonus multiplier
 function calculatePerformanceBonus(wpm: number, accuracy: number, maxChain: number): number {
@@ -38,10 +45,21 @@ setOnSolChange((solState) => {
   // Update garden with sol state
   garden = { ...garden, sessionSol: solState.sessionSol, lifetimeSol: solState.lifetimeSol };
   saveGarden(garden);
+
+  // Dual-write: emit event for future event-driven architecture
+  // (amount is approximated here; will be accurate when SolSystem emits directly)
 });
 
 // Set up golden letter capture callback
 setOnGoldenCapture((reward, wordIndex, charIndex) => {
+  // Dual-write: emit event
+  eventBus.emit({
+    type: 'GOLDEN_CAPTURED',
+    reward: reward as 1 | 2 | 3,
+    wordIndex,
+    charIndex,
+  });
+
   // Spawn particles from the captured letter's position (scaled by reward)
   const pos = getCharacterPosition(wordIndex, charIndex);
   if (pos) {
@@ -62,6 +80,9 @@ setOnGoldenCapture((reward, wordIndex, charIndex) => {
 
 // Set up golden letter expiry callback to trigger re-render
 setOnGoldenExpiry(() => {
+  // Dual-write: emit event
+  eventBus.emit({ type: 'GOLDEN_EXPIRED' });
+
   const state = getTypingState();
   if (state) renderWords(state);
 });
@@ -71,6 +92,9 @@ let greenCaptured = false;
 
 // Set up green letter capture callback (triggers fever mode or QR modal)
 setOnGreenCapture(() => {
+  // Dual-write: emit event
+  eventBus.emit({ type: 'GREEN_CAPTURED' });
+
   // Green captured during mechanics phase - transition to fever
   if (getCurrentPhase() === 'mechanics' && !greenCaptured) {
     greenCaptured = true;
