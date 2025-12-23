@@ -1,15 +1,19 @@
 import './style.css';
 import { startTyping } from './typing.ts';
-import { loadGarden, initGarden, saveGarden } from './garden.ts';
+import { saveGarden } from './garden.ts';
 import type { GardenState } from './garden.ts';
 import { render, renderWords, initCursorIdleDetection, resetScroll, showFocusOverlay, hideFocusOverlay, fadeInWords, fadeOutWords, prepareWordsFadeIn, renderSolBar, hideSolBar, popInSolBar, renderTutorialStatsModal, initTutorialResetShortcut, setFeverMode, setAllLettersGreen, renderChainCounter, hideChainCounter, triggerScreenGlow, renderQRModal } from './ui.ts';
 import { generateWords } from './words.ts';
-import { initSol, earnBaseSol, earnGoldenSol, earnBonusSol, setOnSolChange, getSolState } from './sol.ts';
+import { earnBaseSol, earnGoldenSol, earnBonusSol, getSolState } from './sol.ts';
 import { setOnGoldenCapture, setOnGoldenExpiry, resetGolden, setGoldenEnabled, setSpawnInterval, resetSpawnInterval, setGoldenStartWordIndex } from './golden.ts';
 import { getTypingState } from './typing.ts';
 import { spawnGoldenParticles, getCharacterPosition, spawnRewardText, spawnCelebrationParticles } from './particles.ts';
-import { shouldShowTutorial, startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, setOnFeverEnd, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
+import { startTutorial, getCurrentPhase, getTutorialConfig, advancePhase, trackFeverGoldenCapture, trackFeverKeystroke, getFeverStats, getCurrentChain, getMaxChain, startTutorialTimer, getTutorialElapsedTime, type TutorialPhase } from './tutorial.ts';
 import { setOnGreenCapture, setGreenLetterPosition, resetGreen } from './green.ts';
+import { game } from './core/Game.ts';
+
+// Initialize Game (sets up all systems, EventBus, RenderSystem)
+game.init();
 
 // Calculate performance bonus multiplier
 function calculatePerformanceBonus(wpm: number, accuracy: number, maxChain: number): number {
@@ -25,22 +29,19 @@ function calculatePerformanceBonus(wpm: number, accuracy: number, maxChain: numb
   return 1 + wpmBonus + accuracyBonus + chainBonus;
 }
 
-// Initialize garden state (load from localStorage or create fresh)
-let garden = loadGarden() ?? initGarden();
+// Garden state is managed by Game class
 let isRunActive = false;
 
-// Initialize sol state
-initSol(garden);
+// Helper to get current garden
+function getGarden(): GardenState {
+  return game.getGarden();
+}
 
-// Set up sol change listener to update UI
-setOnSolChange((solState) => {
-  renderSolBar(solState.sessionSol);
-  // Update garden with sol state
-  garden = { ...garden, sessionSol: solState.sessionSol, lifetimeSol: solState.lifetimeSol };
-  saveGarden(garden);
-});
+// Sol bar updates are now handled by RenderSystem via SOL_EARNED events
+// Garden state updates are handled by Game class via events
 
 // Set up golden letter capture callback
+// NOTE: GOLDEN_CAPTURED event is emitted by GoldenSystem, no dual-write needed here
 setOnGoldenCapture((reward, wordIndex, charIndex) => {
   // Spawn particles from the captured letter's position (scaled by reward)
   const pos = getCharacterPosition(wordIndex, charIndex);
@@ -61,6 +62,7 @@ setOnGoldenCapture((reward, wordIndex, charIndex) => {
 });
 
 // Set up golden letter expiry callback to trigger re-render
+// NOTE: GOLDEN_EXPIRED event is emitted by GoldenSystem, no dual-write needed here
 setOnGoldenExpiry(() => {
   const state = getTypingState();
   if (state) renderWords(state);
@@ -70,17 +72,20 @@ setOnGoldenExpiry(() => {
 let greenCaptured = false;
 
 // Set up green letter capture callback (triggers fever mode or QR modal)
+// NOTE: GREEN_CAPTURED event is emitted by GreenSystem, no dual-write needed here
 setOnGreenCapture(() => {
   // Green captured during mechanics phase - transition to fever
   if (getCurrentPhase() === 'mechanics' && !greenCaptured) {
     greenCaptured = true;
     fadeOutWords().then(() => {
+      // Guard against double execution
+      if (getCurrentPhase() !== 'mechanics') return;
       advancePhase(); // moves to 'fever'
       startTutorialPhase('fever');
     });
   }
   // Green captured in endless mode (after tutorial) - show QR modal
-  if (getCurrentPhase() === null && garden.tutorialComplete) {
+  if (getCurrentPhase() === null && getGarden().tutorialComplete) {
     renderQRModal('https://typegarden.vercel.app');
   }
 });
@@ -124,7 +129,7 @@ function startTutorialPhase(phase: TutorialPhase): void {
   }
 
   // Render fresh UI
-  render(garden);
+  render(getGarden());
   resetScroll();
   resetGolden();
 
@@ -188,6 +193,8 @@ function handleTutorialPhaseComplete(): void {
       popInSolBar();
       // Wait for sol bar animation to complete (500ms) before showing next prompt
       setTimeout(() => {
+        // Guard against double execution (HMR can cause duplicate calls)
+        if (getCurrentPhase() !== 'intro') return;
         advancePhase();
         startTutorialPhase('mechanics');
       }, 600);
@@ -197,6 +204,8 @@ function handleTutorialPhaseComplete(): void {
     // But if they finish typing without capturing green, still advance
     if (!greenCaptured) {
       fadeOutWords().then(() => {
+        // Guard against double execution
+        if (getCurrentPhase() !== 'mechanics') return;
         advancePhase();
         startTutorialPhase('fever');
       });
@@ -237,10 +246,7 @@ function handleTutorialPhaseComplete(): void {
         triggerSolBurstCelebration();
       }, 150);
 
-      // Mark tutorial complete
-      garden = { ...garden, tutorialComplete: true };
-      saveGarden(garden);
-
+      // Mark tutorial complete (handled by Game class via PHASE_CHANGED event)
       // Start endless mode with "enjoy"
       advancePhase(); // moves to null
       startEndlessWithEnjoy();
@@ -265,7 +271,7 @@ function startEndlessWithEnjoy(): void {
   resetSpawnInterval();
 
   // Render fresh UI
-  render(garden);
+  render(getGarden());
   resetScroll();
   resetGolden();
   resetGreen();
@@ -303,7 +309,7 @@ function startEndlessWithEnjoy(): void {
 
 function startTypingSession(): void {
   // Check if tutorial should be shown
-  if (shouldShowTutorial(garden)) {
+  if (game.shouldShowTutorial()) {
     startTutorial();
     startTutorialPhase('intro');
     return;
@@ -311,7 +317,7 @@ function startTypingSession(): void {
 
   // Regular endless mode
   // Render fresh UI
-  render(garden);
+  render(getGarden());
   resetScroll();
   resetGolden();
 
@@ -348,14 +354,13 @@ function handleKeyPress(): void {
 }
 
 // Initial render and start
-render(garden);
+render(getGarden());
 initCursorIdleDetection();
 document.addEventListener('keydown', handleKeyPress);
 
 // Ctrl+Shift+Backspace resets tutorial progress
 initTutorialResetShortcut(() => {
-  garden = { ...initGarden(), sessionSol: 0, lifetimeSol: 0 };
-  saveGarden(garden);
+  game.resetTutorial();
   window.location.reload();
 });
 

@@ -1,256 +1,167 @@
 // Tutorial System
 // Guides new players through intro, mechanics, and fever rush
+// Now delegates to TutorialStateMachine for state management
 
 import type { GardenState } from './garden.ts';
+import type { FeverStats } from './core/types.ts';
+import { feverSystem } from './systems/FeverSystem.ts';
+import { tutorialStateMachine, TUTORIAL_PROMPTS as STATE_MACHINE_PROMPTS } from './state/TutorialStateMachine.ts';
+import type { TutorialPhaseConfig } from './state/TutorialStateMachine.ts';
 
 export type TutorialPhase = 'intro' | 'mechanics' | 'fever' | 'stats' | null;
 
-export interface TutorialPhaseConfig {
-  words: string[];
-  goldenEnabled: boolean;
-  goldenSpawnInterval: number;
-  goldenStartWordIndex: number;
-  greenLetterPosition: { wordIndex: number; charIndex: number } | null;
-  solBarVisible: boolean;
-  allLettersGreen: boolean;  // Every char capturable in fever
-}
+// Re-export types for backwards compatibility
+export type { TutorialPhaseConfig };
+export type { FeverStats };
 
-export interface FeverStats {
-  startTime: number;
-  goldenCaptures: number;
-  correctKeystrokes: number;
-  incorrectKeystrokes: number;
-  currentChain: number;
-  maxChain: number;
-}
-
-// Tutorial prompt text content
-export const TUTORIAL_PROMPTS = {
-  intro: "welcome to typegarden, a game that grows the more you type: handcrafted by russell antonie pasetes.",
-  mechanics: "every correct word you type gains you more sol. think of it as sunlight for your garden. you are free to make any mistakes, as long as you keep moving forward. over time you will notice golden letters appear as you type. catch them in time to gain a sol burst. stay in flow and you will catch more golden letters. sometimes, rarer characters appear that are different from the usual golden letter. type them to trigger something special!",
-  fever: "yooo welcome to fever mode lmao every letter is golden now so just go crazy and collect everything you can. dont mess up tho or your chain breaks and thats kinda sad. anyway yeah ive been practicing this demo so many times im actually so tired rn. did i get a perfect streak so far? someone in the audience let me know. especially in the back, idk if yall can read this haha. almost done i think. gg wp see ya"
-};
-
-// Current tutorial state
-let currentPhase: TutorialPhase = null;
-let feverStats: FeverStats | null = null;
-let tutorialStartTime: number | null = null;
-
-// Callbacks
-let onPhaseChangeCallback: ((phase: TutorialPhase) => void) | null = null;
-let onFeverEndCallback: ((stats: FeverStats, wpm: number, accuracy: number) => void) | null = null;
-
-export function setOnPhaseChange(callback: (phase: TutorialPhase) => void): void {
-  onPhaseChangeCallback = callback;
-}
-
-export function setOnFeverEnd(callback: (stats: FeverStats, wpm: number, accuracy: number) => void): void {
-  onFeverEndCallback = callback;
-}
+// Re-export prompts for backwards compatibility
+export const TUTORIAL_PROMPTS = STATE_MACHINE_PROMPTS;
 
 export function shouldShowTutorial(garden: GardenState): boolean {
   return !garden.tutorialComplete;
 }
 
 export function getCurrentPhase(): TutorialPhase {
-  return currentPhase;
+  return tutorialStateMachine.getPhase();
 }
 
 export function startTutorial(): void {
-  currentPhase = 'intro';
-  feverStats = null;
+  tutorialStateMachine.start();
 }
 
 export function advancePhase(): TutorialPhase {
-  switch (currentPhase) {
-    case 'intro':
-      currentPhase = 'mechanics';
-      break;
-    case 'mechanics':
-      currentPhase = 'fever';
-      startFeverTracking();
-      break;
-    case 'fever':
-      currentPhase = 'stats';
-      endFeverTracking();
-      break;
-    case 'stats':
-      currentPhase = null;
-      break;
-  }
-
-  if (onPhaseChangeCallback) {
-    onPhaseChangeCallback(currentPhase);
-  }
-
-  return currentPhase;
+  // Delegate to state machine - it handles the transition and emits events
+  tutorialStateMachine.completePhase();
+  return tutorialStateMachine.getPhase();
 }
 
-// Find the position of "!" in mechanics prompt for green letter
-function findGreenLetterPosition(): { wordIndex: number; charIndex: number } | null {
-  const words = TUTORIAL_PROMPTS.mechanics.split(' ');
-  for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
-    const word = words[wordIndex];
-    const charIndex = word?.indexOf('!');
-    if (charIndex !== undefined && charIndex !== -1) {
-      return { wordIndex, charIndex };
-    }
+// getTutorialConfig now delegates to state machine
+// The phase parameter is kept for backwards compatibility but we use current state
+export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
+  // If asking for current phase config, use state machine directly
+  if (phase === tutorialStateMachine.getPhase()) {
+    return tutorialStateMachine.getConfig();
   }
-  return null;
-}
 
-// Find the word index where sentence N starts (1-indexed)
-// Sentences end with . ! or ?
-function findSentenceStartWordIndex(sentenceNumber: number): number {
-  const words = TUTORIAL_PROMPTS.mechanics.split(' ');
-  let currentSentence = 1;
+  // For specific phase lookup (used during transitions), create temp state
+  // This maintains backwards compatibility with how main.ts calls this
+  const tempMachine = new (class {
+    getConfigForPhase(p: TutorialPhase): TutorialPhaseConfig {
+      const prompts = TUTORIAL_PROMPTS;
 
-  if (sentenceNumber <= 1) return 0;
+      switch (p) {
+        case 'intro':
+          return {
+            words: prompts.intro.split(' '),
+            goldenEnabled: false,
+            goldenSpawnInterval: 20,
+            goldenStartWordIndex: 0,
+            greenLetterPosition: null,
+            solBarVisible: false,
+            allLettersGreen: false,
+          };
 
-  for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
-    const word = words[wordIndex];
-    if (word && /[.!?]$/.test(word)) {
-      currentSentence++;
-      if (currentSentence === sentenceNumber) {
-        return wordIndex + 1; // Next word starts the new sentence
+        case 'mechanics': {
+          const words = prompts.mechanics.split(' ');
+          // Find green letter position (!)
+          let greenPos: { wordIndex: number; charIndex: number } | null = null;
+          for (let wi = 0; wi < words.length; wi++) {
+            const ci = words[wi]?.indexOf('!');
+            if (ci !== undefined && ci !== -1) {
+              greenPos = { wordIndex: wi, charIndex: ci };
+              break;
+            }
+          }
+          // Find sentence 4 start
+          let currentSentence = 1;
+          let goldenStart = 0;
+          for (let wi = 0; wi < words.length; wi++) {
+            if (/[.!?]$/.test(words[wi] ?? '')) {
+              currentSentence++;
+              if (currentSentence === 4) {
+                goldenStart = wi + 1;
+                break;
+              }
+            }
+          }
+          return {
+            words,
+            goldenEnabled: true,
+            goldenSpawnInterval: 20,
+            goldenStartWordIndex: goldenStart,
+            greenLetterPosition: greenPos,
+            solBarVisible: true,
+            allLettersGreen: false,
+          };
+        }
+
+        case 'fever':
+          return {
+            words: prompts.fever.split(' '),
+            goldenEnabled: true,
+            goldenSpawnInterval: 5,
+            goldenStartWordIndex: 0,
+            greenLetterPosition: null,
+            solBarVisible: true,
+            allLettersGreen: true,
+          };
+
+        default:
+          return {
+            words: [],
+            goldenEnabled: true,
+            goldenSpawnInterval: 20,
+            goldenStartWordIndex: 0,
+            greenLetterPosition: null,
+            solBarVisible: true,
+            allLettersGreen: false,
+          };
       }
     }
-  }
-  return 0;
+  })();
+
+  return tempMachine.getConfigForPhase(phase);
 }
 
-export function getTutorialConfig(phase: TutorialPhase): TutorialPhaseConfig {
-  switch (phase) {
-    case 'intro':
-      return {
-        words: TUTORIAL_PROMPTS.intro.split(' '),
-        goldenEnabled: false,
-        goldenSpawnInterval: 20,
-        goldenStartWordIndex: 0,
-        greenLetterPosition: null,
-        solBarVisible: false,
-        allLettersGreen: false,
-      };
-
-    case 'mechanics':
-      return {
-        words: TUTORIAL_PROMPTS.mechanics.split(' '),
-        goldenEnabled: true,
-        goldenSpawnInterval: 20, // Normal spawn rate
-        goldenStartWordIndex: findSentenceStartWordIndex(4), // Golden starts at sentence 4
-        greenLetterPosition: findGreenLetterPosition(),
-        solBarVisible: true,
-        allLettersGreen: false,
-      };
-
-    case 'fever':
-      return {
-        words: TUTORIAL_PROMPTS.fever.split(' '),
-        goldenEnabled: true,
-        goldenSpawnInterval: 5, // High spawn rate for chain bursts
-        goldenStartWordIndex: 0,
-        greenLetterPosition: null,
-        solBarVisible: true,
-        allLettersGreen: true,  // Every letter capturable
-      };
-
-    default:
-      return {
-        words: [],
-        goldenEnabled: true,
-        goldenSpawnInterval: 20,
-        goldenStartWordIndex: 0,
-        greenLetterPosition: null,
-        solBarVisible: true,
-        allLettersGreen: false,
-      };
-  }
-}
-
-// Fever stats tracking
-function startFeverTracking(): void {
-  feverStats = {
-    startTime: Date.now(),
-    goldenCaptures: 0,
-    correctKeystrokes: 0,
-    incorrectKeystrokes: 0,
-    currentChain: 0,
-    maxChain: 0,
-  };
-}
-
-function endFeverTracking(): void {
-  if (!feverStats) return;
-
-  const duration = Date.now() - feverStats.startTime;
-  const minutes = duration / 60000;
-  const wpm = minutes > 0 ? Math.round((feverStats.correctKeystrokes / 5) / minutes) : 0;
-  const total = feverStats.correctKeystrokes + feverStats.incorrectKeystrokes;
-  const accuracy = total > 0 ? Math.round((feverStats.correctKeystrokes / total) * 100) : 100;
-
-  if (onFeverEndCallback) {
-    onFeverEndCallback(feverStats, wpm, accuracy);
-  }
-}
-
+// Fever stats tracking - delegates to FeverSystem
 export function trackFeverGoldenCapture(): void {
-  if (feverStats) {
-    feverStats.goldenCaptures++;
-  }
+  feverSystem.trackGoldenCapture();
 }
 
 export function trackFeverKeystroke(correct: boolean): void {
-  if (feverStats) {
-    if (correct) {
-      feverStats.correctKeystrokes++;
-    } else {
-      feverStats.incorrectKeystrokes++;
-    }
-  }
+  feverSystem.trackKeystroke(correct);
 }
 
 export function getFeverStats(): FeverStats | null {
-  return feverStats;
+  return feverSystem.getStats();
 }
 
-// Chain tracking for fever mode
+// Chain tracking - delegates to FeverSystem
 export function incrementChain(): number {
-  if (feverStats) {
-    feverStats.currentChain++;
-    feverStats.maxChain = Math.max(feverStats.maxChain, feverStats.currentChain);
-    return feverStats.currentChain;
-  }
-  return 0;
+  return feverSystem.incrementChain();
 }
 
 export function breakChain(): void {
-  if (feverStats) {
-    feverStats.currentChain = 0;
-  }
+  feverSystem.breakChain();
 }
 
 export function getCurrentChain(): number {
-  return feverStats?.currentChain ?? 0;
+  return feverSystem.getCurrentChain();
 }
 
 export function getMaxChain(): number {
-  return feverStats?.maxChain ?? 0;
+  return feverSystem.getMaxChain();
 }
 
 export function resetTutorial(): void {
-  currentPhase = null;
-  feverStats = null;
-  tutorialStartTime = null;
+  tutorialStateMachine.reset();
 }
 
-// Tutorial timer - starts on first keystroke
+// Tutorial timer - delegates to state machine
 export function startTutorialTimer(): void {
-  if (tutorialStartTime === null) {
-    tutorialStartTime = Date.now();
-  }
+  tutorialStateMachine.startTimer();
 }
 
 export function getTutorialElapsedTime(): number {
-  if (tutorialStartTime === null) return 0;
-  return Date.now() - tutorialStartTime;
+  return tutorialStateMachine.getElapsedTime();
 }

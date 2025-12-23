@@ -4,6 +4,9 @@ import { generateWords } from './words.ts';
 import { onCharacterTyped, isGoldenPosition, captureGolden, checkPassed, resetGolden, onTypo, expireGolden, triggerFeverCapture } from './golden.ts';
 import { isGreenPosition, captureGreen } from './green.ts';
 import { getCurrentPhase, incrementChain, breakChain } from './tutorial.ts';
+import { inputSystem } from './input/InputSystem.ts';
+import { registerCommands } from './input/commands/index.ts';
+import { eventBus } from './core/EventBus.ts';
 
 export interface TypingState {
   words: string[];
@@ -392,11 +395,12 @@ function handleCharacter(char: string): void {
     const isWordComplete = newTyped.length === currentWord.length;
 
     if (isLastWord && isWordComplete) {
-      // Final character of tutorial typed - trigger completion immediately
+      // Final character of current words typed
       if (onWordCompleteCallback) {
         onWordCompleteCallback();
       }
-      if (onCompleteCallback) {
+      // Only trigger completion if no more tutorial sentences remain
+      if (onCompleteCallback && remainingTutorialSentences.length === 0) {
         onCompleteCallback(currentState);
       }
     }
@@ -455,7 +459,24 @@ export function getTypingState(): TypingState | null {
   return currentState;
 }
 
+// Initialize InputSystem with all commands
+let commandsRegistered = false;
+
+function initInputSystem(): void {
+  if (commandsRegistered) return;
+  registerCommands();
+  commandsRegistered = true;
+
+  // Bridge WORD_COMPLETED events to legacy callbacks
+  eventBus.on('WORD_COMPLETED', (event) => {
+    if (event.correct && onWordCompleteCallback) {
+      onWordCompleteCallback();
+    }
+  });
+}
+
 export function initTyping(_garden: GardenState): void {
-  // This will be called from main.ts
+  // Initialize InputSystem with commands
+  initInputSystem();
   // The actual typing session is started via startTyping()
 }
